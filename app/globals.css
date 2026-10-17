@@ -1,26 +1,130 @@
 @import "tailwindcss";
-
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f8fafc;
+  --foreground: #1c2739;
+  --primary: #4263d9;
+  --muted: #f1f4f8;
+  --muted-foreground: #7a8496;
+  --border: #e6eaf0;
 }
-
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-primary: var(--primary);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --font-sans: Arial, Helvetica, sans-serif;
 }
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
 }
-
 body {
+  margin: 0;
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+button,
+a,
+input,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+button {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: not-allowed;
+}
+a {
+  text-decoration: none;
+}
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
+}
+::selection {
+  background: #dce5ff;
+}
+select {
+  height: 38px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: white;
+  padding: 0 10px;
+  font-size: 13px;
+  color: var(--foreground);
+}
+textarea {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px;
+  width: 100%;
+  font: inherit;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  text-align: left;
+}
+th {
+  font-size: 11px;
+  font-weight: 500;
+  color: #8390a2;
+  background: #fafbfc;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+}
+td {
+  padding: 15px 20px;
+  border-bottom: 1px solid #eef1f5;
+  font-size: 12px;
+}
+tbody tr:last-child td {
+  border-bottom: 0;
+}
+tbody tr:hover {
+  background: #fbfcff;
+}
+dialog {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0;
+  box-shadow: 0 30px 100px #17233430;
+  max-width: calc(100vw - 32px);
+}
+dialog::backdrop {
+  background: #12203955;
+  backdrop-filter: blur(2px);
+}
+.grid-pattern {
+  background-image:
+    linear-gradient(#ffffff07 1px, transparent 1px),
+    linear-gradient(90deg, #ffffff07 1px, transparent 1px);
+  background-size: 54px 54px;
+}
+.fade-in {
+  animation: fade-in 0.25s ease-out;
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.sidebar-note {
+  display: none;
+}
+@media (min-height: 850px) {
+  .sidebar-note {
+    display: block;
+  }
 }

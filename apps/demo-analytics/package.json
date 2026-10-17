@@ -1,0 +1,16 @@
+{
+  "name": "@company/demo-analytics",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --import tsx server.ts",
+    "start": "NODE_ENV=production node --import tsx server.ts"
+  },
+  "dependencies": {
+    "@company/demo-runtime": "workspace:*",
+    "dotenv": "17.3.1"
+  },
+  "devDependencies": {
+    "tsx": "4.21.0"
+  }
+}

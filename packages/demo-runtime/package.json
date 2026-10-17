@@ -1,0 +1,12 @@
+{
+  "name": "@company/demo-runtime",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": "./src/server.ts",
+  "dependencies": {
+    "@company/access-client": "workspace:*",
+    "openid-client": "6.8.8",
+    "dotenv": "17.3.1"
+  }
+}
