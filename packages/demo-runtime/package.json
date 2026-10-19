@@ -8,5 +8,6 @@
     "@company/access-client": "workspace:*",
     "openid-client": "6.8.8",
     "dotenv": "17.3.1"
-  }
+  },
+  "license": "MIT"
 }

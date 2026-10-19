@@ -1,0 +1,22 @@
+name: Feature request
+description: Propose a change to Permit Kit.
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: Who needs this and what are they trying to accomplish?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the desired outcome and any alternatives considered.
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Compatibility and security considerations
+      description: Note any changes to authentication, permissions, storage, or existing integrations.

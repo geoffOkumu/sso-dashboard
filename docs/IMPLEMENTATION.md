@@ -1,6 +1,6 @@
 # Implementation checklist
 
-The existing root Next.js application remains the identity portal so the configured root `.env` continues to work. Independent demo applications live in `apps/`; reusable authorization code lives in `packages/`. Use a pnpm workspace and pinned dependencies.
+The root Next.js application is the identity portal. Independent demo applications live in `apps/`; reusable authorization code lives in `packages/`. Use a pnpm workspace and pinned dependencies.
 
 - [x] Verify installed and official provider APIs.
 - [x] Generate provider schema; add policy models, constraints, migration, environment validation.

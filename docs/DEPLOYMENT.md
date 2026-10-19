@@ -4,7 +4,7 @@
 
 Use Node.js 24, PostgreSQL 17+, a persistent identity database, and an SMTP service. Install pinned dependencies with `pnpm install --frozen-lockfile`, generate the Prisma client, run `pnpm db:migrate` as a deployment job, then build and start the central app. Run migrations once per release, not from every server instance. The configured `BETTER_AUTH_URL` must be the final public HTTPS origin, without a trailing slash. The issuer is that origin plus `/api/auth`.
 
-The root project remains the identity app to preserve the existing starter and root database environment. Demo apps run independently from their own directories. Their tiny Node servers bind loopback by design; put a reverse proxy in front. Each owns its `.data` directory and should run as a single instance. A real horizontally scaled tool should replace demo SQLite with its own shared database; do not point it at the identity database.
+The root project is the identity provider. Demo apps run independently from their own directories. Their tiny Node servers bind loopback by design; put a reverse proxy in front. Each owns its `.data` directory and should run as a single instance. A real horizontally scaled tool should replace demo SQLite with its own shared database; do not point it at the identity database.
 
 Example domains:
 
@@ -46,5 +46,5 @@ Administrative database mutations and their audit entry commit together. Provide
 - Positive access checks can be cached up to 60 seconds; sensitive operations bypass cache. Central outages fail closed after cache expiry.
 - Single-company scope only. No registration, tenant switching or billing.
 - Demo application records and sessions use local SQLite, not a production multi-instance storage architecture.
-- The Next.js starter's Turbopack CSS worker could not bind its worker port in this environment. Development and production commands use Next.js's supported Webpack option and standard Tailwind PostCSS processing.
-- The pinned Next.js ESLint dependency chain includes an upstream `braces` advisory whose advisory names a fix in 3.0.4, but the configured registry currently only publishes through 3.0.3. It affects developer lint glob processing, not the production dependency tree. Do not lint attacker-controlled pathological glob configurations. Recheck and upgrade the lint chain when patched. No forced downgrade of Next.js was applied.
+- Development and production commands use Next.js's supported Webpack option and standard Tailwind PostCSS processing.
+- Dependency audit results are time-sensitive. Run `pnpm audit` and `pnpm audit --prod` before each release, review any advisories, and consult the dated [validation report](VALIDATION.md).

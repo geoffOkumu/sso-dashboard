@@ -68,5 +68,19 @@
     "effect": "3.20.0",
     "deepmerge-ts": "8.0.2",
     "esbuild": "0.28.1"
-  }
+  },
+  "description": "Self-hosted identity and access management for internal tools, with OIDC SSO and live authorization.",
+  "engines": {
+    "node": ">=24 <25",
+    "pnpm": "11.9.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/geoffOkumu/sso-dashboard.git"
+  },
+  "bugs": {
+    "url": "https://github.com/geoffOkumu/sso-dashboard/issues"
+  },
+  "homepage": "https://github.com/geoffOkumu/sso-dashboard#readme",
+  "license": "MIT"
 }

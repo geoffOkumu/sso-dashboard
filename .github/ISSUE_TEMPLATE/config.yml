@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security reporting policy
+    url: https://github.com/geoffOkumu/sso-dashboard/blob/HEAD/SECURITY.md
+    about: Read how to report a vulnerability privately before sharing details.

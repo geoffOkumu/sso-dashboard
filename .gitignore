@@ -47,3 +47,19 @@ test-results/
 .generated/
 **/.data/
 .pnpm-store/
+
+# local databases, backups, and private keys
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3-wal
+*.sqlite3-shm
+*.db
+*.db-wal
+*.db-shm
+*.dump
+*.backup
+*.key
+*.p12
+*.pfx

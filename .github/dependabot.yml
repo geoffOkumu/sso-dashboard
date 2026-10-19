@@ -1,0 +1,24 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      better-auth:
+        patterns:
+          - better-auth
+          - "@better-auth/*"
+      nextjs:
+        patterns:
+          - next
+          - eslint-config-next
+      prisma:
+        patterns:
+          - prisma
+          - "@prisma/client"
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
