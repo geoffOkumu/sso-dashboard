@@ -1,4 +1,5 @@
 import { Brand } from "./brand";
+import Link from "next/link";
 import { ShieldCheck, Check, ArrowUpRight } from "lucide-react";
 export function AuthShell({
   children,
@@ -9,15 +10,15 @@ export function AuthShell({
 }) {
   return (
     <div className="grid min-h-screen lg:grid-cols-[46%_54%]">
-      <aside className="grid-pattern relative hidden overflow-hidden bg-[#15233c] px-14 py-11 text-white lg:flex lg:flex-col">
+      <aside className="grid-pattern relative hidden overflow-hidden bg-brand-ink px-14 py-11 text-white lg:flex lg:flex-col">
         <Brand dark name={name} />
         <div className="absolute -right-32 top-44 h-[540px] w-[540px] rounded-full border border-white/10">
           <div className="absolute inset-16 rounded-full border border-white/10" />
           <div className="absolute inset-32 rounded-full border border-white/10" />
         </div>
         <div className="relative my-auto max-w-[420px] py-24">
-          <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-[10px] tracking-[1.7px] text-blue-200">
-            <span className="h-1.5 w-1.5 rounded-full bg-blue-300" />
+          <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-[10px] tracking-[1.7px] text-primary-light">
+            <span className="h-1.5 w-1.5 rounded-full bg-primary-light" />
             YOUR CONNECTED WORKSPACE
           </div>
           <h2 className="text-[46px] font-medium leading-[1.15] tracking-[-1.6px]">
@@ -36,7 +37,7 @@ export function AuthShell({
               "Built around your team's security",
             ].map((text) => (
               <div key={text} className="flex items-center gap-3">
-                <span className="grid h-5 w-5 place-items-center rounded-full bg-blue-400/10 text-blue-300">
+                <span className="grid h-5 w-5 place-items-center rounded-full bg-primary/20 text-primary-light">
                   <Check size={11} />
                 </span>
                 {text}
@@ -64,6 +65,12 @@ export function AuthShell({
         </main>
         <footer className="p-8 text-center text-[11px] text-muted-foreground">
           Protected with encrypted sessions and multi-factor authentication.
+          <Link
+            href="/docs"
+            className="mt-3 block text-primary hover:underline"
+          >
+            Integration docs
+          </Link>
         </footer>
       </div>
     </div>

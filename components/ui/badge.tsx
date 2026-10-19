@@ -12,7 +12,7 @@ export function Badge({
         "inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] font-medium",
         {
           green: "bg-emerald-50 text-emerald-700",
-          blue: "bg-blue-50 text-blue-700",
+          blue: "bg-primary-soft text-primary",
           amber: "bg-amber-50 text-amber-700",
           red: "bg-red-50 text-red-700",
           neutral: "bg-slate-100 text-slate-600",

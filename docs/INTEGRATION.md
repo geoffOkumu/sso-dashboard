@@ -1,8 +1,10 @@
 # Connect another application
 
+For public documentation with endpoint URLs and examples tailored to the running environment, open `/docs` on your identity deployment. These URLs use its configured `BETTER_AUTH_URL` at request time.
+
 ## Register it
 
-1. Bootstrap/sign in to Company Access and finish MFA enrollment.
+1. Bootstrap/sign in to Permit Kit and finish MFA enrollment.
 2. In **Platforms**, add a name, slug, icon and launch URL. Use the tool's `/login` route as the launch URL. Saving this URL alone does not integrate SSO.
 3. Add permission keys such as `contacts.read`, `contacts.write` and `contacts.delete`. Create roles and select their permissions.
 4. Register a client for each environment. Enter exact callback URLs and optional post-logout URLs. In production all URLs must use HTTPS. Copy the provider-generated secret immediately; only its hash is stored centrally. Client IDs are not secrets. Secrets belong exclusively in the tool's server environment.

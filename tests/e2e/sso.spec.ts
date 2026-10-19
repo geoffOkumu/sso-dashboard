@@ -208,18 +208,111 @@ test("MFA enrollment is mandatory for a superadmin and revokes pre-enrollment se
   await page.goto("/security");
   await page.getByLabel("Confirm your password").fill(fixture.password);
   await page.getByRole("button", { name: "Set up MFA", exact: true }).click();
+  const qr = page.getByRole("img", { name: "Authenticator setup QR code" });
+  await expect(qr).toBeVisible();
   await expect(
-    page.getByText("1. Add this account to your authenticator"),
+    page.getByText("Setup in progress", { exact: true }),
   ).toBeVisible();
-  const secret = await page.locator("code").first().textContent();
+  await expect(page.getByLabel("Recovery codes", { exact: true })).toHaveCount(
+    0,
+  );
+  await page.getByRole("button", { name: "Cancel setup" }).click();
+  await expect(qr).toHaveCount(0);
+  await expect(page.getByLabel("Confirm your password")).toHaveValue("");
+  expect((await page.request.get("/api/admin/users")).status()).toBe(403);
+  await page.getByLabel("Confirm your password").fill(fixture.password);
+  await page.getByRole("button", { name: "Set up MFA", exact: true }).click();
+  await expect(qr).toBeVisible();
+  await expect(qr.locator("path")).not.toHaveCount(0);
+  await page.getByText("Can’t scan the code?", { exact: true }).click();
+  const secret = await page.getByLabel("Authenticator setup key").textContent();
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.getByRole("button", { name: "Copy setup key" }).click();
+  await expect(page.getByRole("status")).toContainText("Setup key copied.");
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+    secret,
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(qr).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: ".generated/mfa-connect-mobile.png",
+    fullPage: true,
+    animations: "disabled",
+  });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.screenshot({
+    path: ".generated/mfa-connect-desktop.png",
+    fullPage: true,
+    animations: "disabled",
+  });
+  const input = page.getByLabel("Six-digit authentication code");
+  const verify = page.getByRole("button", { name: "Verify and enable" });
+  await expect(verify).toBeDisabled();
+  await input.fill("123");
+  await expect(verify).toBeDisabled();
+  // A rejected verification must preserve enrollment so the user can retry.
+  await page.route("**/api/auth/two-factor/verify-totp", (route) =>
+    route.fulfill({
+      status: 400,
+      contentType: "application/json",
+      body: JSON.stringify({ code: "INVALID_CODE", message: "Invalid code" }),
+    }),
+  );
+  await input.fill("123456");
+  await verify.click();
+  await expect(
+    page
+      .getByRole("alert")
+      .filter({ hasText: "Enter the latest six-digit code" }),
+  ).toBeVisible();
+  await expect(qr).toBeVisible();
+  await expect(page.getByLabel("Authenticator setup key")).toHaveText(secret!);
+  await page.unroute("**/api/auth/two-factor/verify-totp");
   const code = await createOTP(
     new TextDecoder().decode(base32.decode(secret!)),
   ).totp();
-  await page.getByLabel("3. Verify a six-digit code").fill(code);
-  await page.getByRole("button", { name: "Verify and enable" }).click();
+  await input.fill(code.slice(0, 3) + " " + code.slice(3));
+  await expect(input).toHaveValue(code);
+  await verify.click();
   await expect(
     page.getByText("MFA is enabled.", { exact: false }),
   ).toBeVisible();
+  await expect(qr).toHaveCount(0);
+  await expect(page.getByLabel("Authenticator setup key")).toHaveCount(0);
+  const recovery = page.getByLabel("Recovery codes", { exact: true });
+  const codes = await recovery.locator("code").allTextContents();
+  expect(codes.length).toBeGreaterThan(0);
+  await expect(
+    page.getByRole("button", { name: "Finish setup" }),
+  ).toBeDisabled();
+  await page.getByRole("button", { name: "Copy codes", exact: true }).click();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+    codes.join("\n"),
+  );
+  const downloadEvent = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download codes" }).click();
+  const download = await downloadEvent;
+  expect(readFileSync((await download.path())!, "utf8")).toContain(
+    codes.join("\n"),
+  );
+  await page.screenshot({
+    path: ".generated/mfa-recovery-desktop.png",
+    fullPage: true,
+  });
+  await page
+    .getByLabel("I have saved my recovery codes somewhere safe.")
+    .check();
+  await page.getByRole("button", { name: "Finish setup" }).click();
+  await expect(
+    page.getByRole("heading", { name: "MFA setup complete" }),
+  ).toBeVisible();
+  await expect(recovery).toHaveCount(0);
+  await expect(page.getByText("Disable MFA", { exact: true })).toHaveCount(0);
   expect((await page.request.get("/api/admin/users")).status()).toBe(200);
   await page.goto("/overview");
   await expect(

@@ -12,12 +12,12 @@ import {
   KeyRound,
   ScrollText,
   Settings,
-  ChevronDown,
   ArrowUpRight,
   LogOut,
   Menu,
   X,
   CircleHelp,
+  BookOpen,
   Plus,
   Activity,
   ArrowRight,
@@ -46,6 +46,7 @@ const employeeNav = [
   { href: "/", name: "My apps", icon: LayoutGrid },
   { href: "/account", name: "Account", icon: UserRound },
   { href: "/security", name: "Security & sessions", icon: ShieldCheck },
+  { href: "/docs", name: "Integration docs", icon: BookOpen },
 ];
 const adminNav = [
   { href: "/overview", name: "Overview", icon: LayoutDashboard },
@@ -103,18 +104,6 @@ export function Portal({
             <X size={17} />
           </button>
         </div>
-        <div className="mx-4 mb-7 flex items-center gap-2.5 rounded-lg border border-border bg-[#fafbfc] p-3">
-          <div className="grid h-8 w-8 place-items-center rounded-md border border-border bg-white text-xs font-bold">
-            CO
-          </div>
-          <div className="flex-1">
-            <p className="text-xs font-semibold">Company workspace</p>
-            <p className="mt-1 text-[10px] text-muted-foreground">
-              Internal applications
-            </p>
-          </div>
-          <ChevronDown size={13} className="text-muted-foreground" />
-        </div>
         <nav
           aria-label="Main navigation"
           className="flex-1 overflow-y-auto px-3"
@@ -128,7 +117,7 @@ export function Portal({
               key={item.href}
               href={item.href}
               aria-current={path === item.href ? "page" : undefined}
-              className={`mb-1 flex items-center gap-3 rounded-md px-3 py-2.5 text-xs ${path === item.href ? "bg-[#edf1ff] font-medium text-primary" : "text-slate-500 hover:bg-muted"}`}
+              className={`mb-1 flex items-center gap-3 rounded-md px-3 py-2.5 text-xs ${path === item.href ? "bg-primary-soft font-medium text-primary" : "text-slate-500 hover:bg-muted"}`}
             >
               <item.icon size={17} strokeWidth={1.7} />
               {item.name}
@@ -148,7 +137,7 @@ export function Portal({
                   key={item.href}
                   href={item.href}
                   aria-current={path === item.href ? "page" : undefined}
-                  className={`mb-1 flex items-center gap-3 rounded-md px-3 py-2.5 text-xs ${path === item.href ? "bg-[#edf1ff] font-medium text-primary" : "text-slate-500 hover:bg-muted"}`}
+                  className={`mb-1 flex items-center gap-3 rounded-md px-3 py-2.5 text-xs ${path === item.href ? "bg-primary-soft font-medium text-primary" : "text-slate-500 hover:bg-muted"}`}
                 >
                   <item.icon size={17} strokeWidth={1.7} />
                   {item.name}
@@ -157,17 +146,6 @@ export function Portal({
             </>
           )}
         </nav>
-        <div className="sidebar-note m-4 rounded-lg border border-blue-100 bg-[#f8faff] p-3.5">
-          <div className="mb-2 flex items-center gap-2 text-xs font-medium">
-            <ShieldCheck size={15} className="text-primary" />A secure place to
-            work
-          </div>
-          <p className="text-[10px] leading-5 text-muted-foreground">
-            Your identity. Your applications.
-            <br />
-            The right access, all in one place.
-          </p>
-        </div>
         <div className="flex items-center gap-2.5 border-t border-border px-5 py-4">
           <Avatar name={user.name} />
           <div className="min-w-0 flex-1">
@@ -306,7 +284,7 @@ export function Avatar({
 }) {
   return (
     <span
-      className={`inline-flex shrink-0 items-center justify-center rounded-full border border-[#dce4f8] bg-[#edf2ff] font-semibold text-[#5f75b4] ${small ? "h-7 w-7 text-[10px]" : "h-8 w-8 text-[11px]"}`}
+      className={`inline-flex shrink-0 items-center justify-center rounded-full border border-primary-border bg-primary-soft font-semibold text-primary ${small ? "h-7 w-7 text-[10px]" : "h-8 w-8 text-[11px]"}`}
     >
       {name
         .split(" ")
@@ -330,19 +308,19 @@ function MyApps({ me }: { me: Me }) {
         title="My apps"
         description="Your tools, together in one place."
       />
-      <div className="relative mb-8 overflow-hidden rounded-xl border border-[#dce5fa] bg-[#edf3ff] px-7 py-7 sm:px-8">
+      <div className="relative mb-8 overflow-hidden rounded-xl border border-primary-border bg-primary-soft px-7 py-7 sm:px-8">
         <div className="relative z-10">
-          <p className="mb-2 text-[10px] font-semibold uppercase tracking-[1.5px] text-[#7387b2]">
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-[1.5px] text-primary">
             YOUR WORKSPACE, SIMPLIFIED
           </p>
-          <h2 className="text-[23px] font-semibold tracking-[-.5px] text-[#24385e]">
+          <h2 className="text-[23px] font-semibold tracking-[-.5px] text-brand-ink">
             Good to see you, {me.user.name.split(" ")[0]}.
           </h2>
-          <p className="mt-2 max-w-md text-xs leading-6 text-[#7586a6]">
+          <p className="mt-2 max-w-md text-xs leading-6 text-muted-foreground">
             Everything you need to do your best work. Open an application below
             and pick up where you left off.
           </p>
-          <div className="mt-5 flex items-center gap-2 text-[11px] text-[#5b75ac]">
+          <div className="mt-5 flex items-center gap-2 text-[11px] text-primary">
             <ShieldCheck size={14} />
             <span>
               One account. Secure access to {me.apps.length} application
@@ -352,9 +330,9 @@ function MyApps({ me }: { me: Me }) {
         </div>
         <div
           aria-hidden
-          className="absolute -right-12 -top-20 h-80 w-80 rotate-[-20deg] rounded-[65px] border-[24px] border-[#dfe8fc]"
+          className="absolute -right-12 -top-20 h-80 w-80 rotate-[-20deg] rounded-[65px] border-[24px] border-primary-border"
         >
-          <div className="absolute inset-10 rounded-[35px] border-[20px] border-[#dfe8fc]" />
+          <div className="absolute inset-10 rounded-[35px] border-[20px] border-primary-border" />
         </div>
       </div>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
@@ -374,7 +352,7 @@ function MyApps({ me }: { me: Me }) {
             <a
               key={app.id}
               href={app.launchUrl}
-              className="group flex min-h-[200px] flex-col rounded-xl border border-border bg-white p-5 transition-all hover:border-blue-200 hover:shadow-[0_5px_20px_#24385e08]"
+              className="group flex min-h-[200px] flex-col rounded-xl border border-border bg-white p-5 transition-all hover:border-primary-border hover:shadow-sm"
             >
               <div className="mb-4 flex items-start justify-between">
                 <AppIcon icon={app.icon} />

@@ -31,7 +31,7 @@ import type { Audit, Platform, User } from "./portal-types";
 function UserIdentity({ user }: { user: User }) {
   return (
     <div className="flex items-center gap-3">
-      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#edf2ff] text-[10px] font-semibold text-[#6f80ad]">
+      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary-soft text-[10px] font-semibold text-primary">
         {user.name
           .split(" ")
           .map((n) => n[0])

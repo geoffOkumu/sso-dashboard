@@ -1,5 +1,5 @@
 {
-  "name": "sso-dashboard",
+  "name": "permit-kit",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -34,6 +34,7 @@
     "next": "16.4.2",
     "nodemailer": "10.1.2",
     "openid-client": "6.8.8",
+    "qrcode.react": "4.2.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "server-only": "0.0.1",

@@ -22,9 +22,6 @@ export async function requireAdmin(requestHeaders?: Headers) {
   if (result.user.globalRole !== "SUPERADMIN")
     throw new HttpError(403, "Superadmin access required");
   if (!result.user.twoFactorEnabled)
-    throw new HttpError(
-      403,
-      "Enroll in MFA before administering Company Access",
-    );
+    throw new HttpError(403, "Enroll in MFA before administering Permit Kit");
   return result;
 }

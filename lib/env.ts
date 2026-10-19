@@ -18,13 +18,13 @@ const schema = z.object({
     }, "Use an origin without a path, query, or credentials")
     .transform((value) => new URL(value).origin),
   BETTER_AUTH_SECRET: z.string().min(32),
-  PRODUCT_NAME: z.string().min(1).max(60).default("Company Access"),
+  PRODUCT_NAME: z.string().min(1).max(60).default("Permit Kit"),
   SMTP_HOST: z.string().default("localhost"),
   SMTP_PORT: z.coerce.number().int().positive().default(1025),
   SMTP_SECURE: z.enum(["true", "false"]).default("false"),
   SMTP_USER: z.string().optional(),
   SMTP_PASSWORD: z.string().optional(),
-  SMTP_FROM: z.string().default("Company Access <access@company.test>"),
+  SMTP_FROM: z.string().default("Permit Kit <access@company.test>"),
   TRUSTED_IP_HEADER: z.string().optional(),
 });
 export function getEnv() {
@@ -40,4 +40,4 @@ export function getEnv() {
     throw new Error("Production BETTER_AUTH_URL must use HTTPS");
   return result.data;
 }
-export const productName = process.env.PRODUCT_NAME || "Company Access";
+export const productName = process.env.PRODUCT_NAME || "Permit Kit";

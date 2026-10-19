@@ -72,7 +72,7 @@ export function AppIcon({
   };
   const Icon = icons[icon as keyof typeof icons] || Layers3;
   const colors = {
-    briefcase: "bg-blue-50 text-blue-600",
+    briefcase: "bg-primary-soft text-primary",
     chart: "bg-violet-50 text-violet-600",
     layers: "bg-orange-50 text-orange-600",
     code: "bg-slate-100 text-slate-600",

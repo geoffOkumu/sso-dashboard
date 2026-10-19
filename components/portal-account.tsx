@@ -1,6 +1,7 @@
 "use client";
 import { useState, type FormEvent } from "react";
-import { Copy, Monitor, ShieldCheck, Smartphone } from "lucide-react";
+import { Monitor } from "lucide-react";
+import { MfaSettings } from "./mfa-settings";
 import { authClient } from "@/lib/auth-client";
 import {
   api,
@@ -130,52 +131,7 @@ export function Account({
 }
 export function Security({ me, refresh }: { me: Me; refresh: () => void }) {
   const [error, setError] = useState(""),
-    [busy, setBusy] = useState(false),
-    [setup, setSetup] = useState<{
-      totpURI: string;
-      backupCodes: string[];
-    } | null>(null),
-    [success, setSuccess] = useState("");
-  async function mfa(
-    e: FormEvent<HTMLFormElement>,
-    action: "enable" | "verify" | "disable",
-  ) {
-    e.preventDefault();
-    setBusy(true);
-    setError("");
-    const f = new FormData(e.currentTarget);
-    try {
-      if (action === "enable") {
-        const result = await authClient.twoFactor.enable({
-          password: String(f.get("password")),
-        });
-        if (result.error) throw new Error(result.error.message);
-        if (result.data.method !== "totp")
-          throw new Error("TOTP setup unavailable");
-        setSetup(result.data);
-      } else if (action === "verify") {
-        const result = await authClient.twoFactor.verifyTotp({
-          code: String(f.get("code")),
-        });
-        if (result.error) throw new Error(result.error.message);
-        setSuccess(
-          "MFA is enabled. Save your recovery codes before leaving this page.",
-        );
-        refresh();
-      } else {
-        const result = await authClient.twoFactor.disable({
-          password: String(f.get("password")),
-        });
-        if (result.error) throw new Error(result.error.message);
-        setSetup(null);
-        refresh();
-      }
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "MFA update failed");
-    } finally {
-      setBusy(false);
-    }
-  }
+    [busy, setBusy] = useState(false);
   async function revoke(id?: string) {
     setBusy(true);
     setError("");
@@ -198,135 +154,8 @@ export function Security({ me, refresh }: { me: Me; refresh: () => void }) {
         title="Security & sessions"
         description="Keep your account protected and control where you're signed in."
       />
-      {error && <ErrorNotice message={error} />}{" "}
-      {success && (
-        <div
-          role="status"
-          className="mb-5 rounded-lg border border-emerald-100 bg-emerald-50 p-4 text-xs text-emerald-800"
-        >
-          {success}
-        </div>
-      )}
-      <Panel className="mb-6 p-6">
-        <div className="mb-5 flex items-start gap-4">
-          <span className="grid h-10 w-10 place-items-center rounded-lg bg-blue-50 text-primary">
-            <Smartphone size={20} />
-          </span>
-          <div className="flex-1">
-            <div className="flex flex-wrap items-center gap-3">
-              <h2 className="text-sm font-semibold">
-                Multi-factor authentication
-              </h2>
-              <Badge tone={me.user.twoFactorEnabled ? "green" : "amber"}>
-                {me.user.twoFactorEnabled ? "Enabled" : "Not configured"}
-              </Badge>
-            </div>
-            <p className="mt-2 text-xs leading-6 text-muted-foreground">
-              Add another layer of protection with an authenticator app.
-              {me.user.globalRole === "SUPERADMIN" &&
-                " Required for all superadmins."}
-            </p>
-          </div>
-        </div>
-        {!me.user.twoFactorEnabled && !setup && (
-          <form
-            onSubmit={(e) => mfa(e, "enable")}
-            className="flex max-w-lg flex-wrap items-end gap-3"
-          >
-            <Field label="Confirm your password">
-              <Input
-                name="password"
-                type="password"
-                required
-                autoComplete="current-password"
-              />
-            </Field>
-            <Button disabled={busy}>
-              <ShieldCheck size={14} />
-              Set up MFA
-            </Button>
-          </form>
-        )}
-        {setup && (
-          <div className="space-y-5 rounded-lg bg-muted p-5">
-            <div>
-              <p className="mb-2 text-xs font-medium">
-                1. Add this account to your authenticator
-              </p>
-              <p className="mb-3 text-xs text-muted-foreground">
-                Use this setup key for a time-based account, or copy the full
-                authenticator URI.
-              </p>
-              <div className="flex items-center gap-2">
-                <code className="break-all rounded bg-white p-3 text-xs">
-                  {new URL(setup.totpURI).searchParams.get("secret")}
-                </code>
-                <Button
-                  size="icon"
-                  variant="outline"
-                  title="Copy authenticator URI"
-                  aria-label="Copy authenticator URI"
-                  onClick={() => navigator.clipboard.writeText(setup.totpURI)}
-                >
-                  <Copy size={14} />
-                </Button>
-              </div>
-            </div>
-            <div>
-              <p className="mb-2 text-xs font-medium">
-                2. Save these single-use recovery codes
-              </p>
-              <p className="mb-2 text-[11px] text-muted-foreground">
-                Keep them in your password manager. They are only shown here.
-              </p>
-              <div className="grid grid-cols-2 gap-2 rounded-lg bg-white p-3 font-mono text-xs">
-                {setup.backupCodes.map((code) => (
-                  <span key={code}>{code}</span>
-                ))}
-              </div>
-            </div>
-            {!me.user.twoFactorEnabled && (
-              <form
-                onSubmit={(e) => mfa(e, "verify")}
-                className="flex flex-wrap items-end gap-3"
-              >
-                <Field label="3. Verify a six-digit code">
-                  <Input
-                    name="code"
-                    required
-                    pattern="[0-9]{6}"
-                    autoComplete="one-time-code"
-                    placeholder="000000"
-                  />
-                </Field>
-                <Button disabled={busy}>Verify and enable</Button>
-              </form>
-            )}
-          </div>
-        )}
-        {me.user.twoFactorEnabled && me.user.globalRole !== "SUPERADMIN" && (
-          <details className="mt-5">
-            <summary className="cursor-pointer text-xs text-muted-foreground">
-              Disable MFA
-            </summary>
-            <form
-              onSubmit={(e) => mfa(e, "disable")}
-              className="mt-3 flex max-w-lg gap-3"
-            >
-              <Input
-                type="password"
-                name="password"
-                required
-                aria-label="Confirm password to disable MFA"
-                placeholder="Confirm password"
-              />
-              <Button disabled={busy} variant="outline">
-                Disable
-              </Button>
-            </form>
-          </details>
-        )}
-      </Panel>
+      {error && <ErrorNotice message={error} />}
+      <MfaSettings me={me} refresh={refresh} />
       <Panel>
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-5">
           <div>

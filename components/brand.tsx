@@ -1,6 +1,6 @@
-import { Layers3 } from "lucide-react";
+import Image from "next/image";
 export function Brand({
-  name = "Company Access",
+  name = "Permit Kit",
   dark = false,
 }: {
   name?: string;
@@ -8,14 +8,16 @@ export function Brand({
 }) {
   return (
     <div
-      className={`flex items-center gap-2.5 font-semibold tracking-tight ${dark ? "text-white" : "text-slate-900"}`}
+      className={`flex items-center gap-2 font-semibold tracking-tight ${dark ? "text-white" : "text-brand-ink"}`}
     >
-      <span
-        className={`grid h-9 w-9 place-items-center rounded-lg ${dark ? "bg-white/15" : "bg-primary"}`}
-      >
-        <Layers3 size={20} strokeWidth={2} className="text-white" />
-      </span>
-      <span className="text-[15px]">{name}</span>
+      <Image
+        src="/brand/mark.png"
+        alt=""
+        width={40}
+        height={40}
+        className="h-10 w-10 shrink-0"
+      />
+      <span className="text-xl font-bold tracking-[-0.7px]">{name}</span>
     </div>
   );
 }

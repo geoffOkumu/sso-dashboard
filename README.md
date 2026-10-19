@@ -1,4 +1,4 @@
-# Company Access
+# Permit Kit
 
 An invitation-only company identity portal with real OIDC SSO, platform-specific roles and permissions, TOTP MFA, invitations, password reset, live authorization and global session revocation.
 
@@ -20,7 +20,7 @@ pnpm dev
 
 Open [localhost:3000](http://localhost:3000). Sign in using the superadmin you created, then go to **Security & sessions** and finish MFA enrollment. Save the recovery codes. Administration and platform access remain blocked until MFA is verified.
 
-`setup:env` creates an ignored `.env.local` with a random authentication secret if the file is absent; it does not overwrite `.env`. If starting from scratch, copy `.env.example` to `.env` and set the database URL. Never overwrite an already configured environment. `PRODUCT_NAME` defaults to `Company Access` and can be changed in the server environment.
+`setup:env` creates an ignored `.env.local` with a random authentication secret if the file is absent; it does not overwrite `.env`. If starting from scratch, copy `.env.example` to `.env` and set the database URL. Never overwrite an already configured environment. `PRODUCT_NAME` defaults to `Permit Kit` and can be changed in the server environment.
 
 The database migration and idempotent CRM/analytics seed have already been applied to the database configured for this implementation. Seed creates only platform/role/permission definitions, not employees or client secrets, and does not overwrite administrator edits on repeat runs.
 
@@ -37,6 +37,8 @@ For a fully containerized local setup, `docker compose up -d postgres mailpit` s
 Production SMTP uses the settings in `.env.example`. Invitation requests persist the invitation then send email; a delivery failure returns a clear error, and **Resend invitation** invalidates the old token before sending a replacement. No invitation links are printed in logs.
 
 ## Add people and connect tools
+
+Public integration documentation is available at `/docs`, with links from sign-in and the dashboard. Endpoint URLs and code examples use the running server's `BETTER_AUTH_URL`, matching the OIDC issuer. The page reads this value at request time, so the same build can be deployed to different environments. Set each deployment's public origin (HTTPS in production) and restart the server after changing it. No sign-in is required and no credentials are exposed.
 
 1. Bootstrap the first superadmin and enable MFA.
 2. In **Users**, invite employees with optional initial platform grants. The emailed link verifies ownership and expires after 24 hours. Existing active users must sign in as the matching verified account before accepting.
