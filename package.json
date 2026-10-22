@@ -24,7 +24,7 @@
   },
   "dependencies": {
     "@better-auth/oauth-provider": "1.7.10",
-    "@prisma/client": "6.19.2",
+    "@prisma/client": "7.10.1",
     "@radix-ui/react-slot": "1.5.0",
     "better-auth": "1.7.10",
     "class-variance-authority": "0.7.1",
@@ -55,7 +55,7 @@
     "eslint-config-next": "16.4.2",
     "jose": "6.2.12",
     "prettier": "3.8.1",
-    "prisma": "6.19.2",
+    "prisma": "7.10.1",
     "smtp-server": "3.19.23",
     "tailwindcss": "4.3.3",
     "tsx": "4.21.0",
