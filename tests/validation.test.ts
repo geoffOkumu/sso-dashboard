@@ -1,9 +1,10 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import {
   isSafeUrl,
   safeReturnPath,
   platformInput,
   inviteInput,
+  clientInput,
 } from "../lib/validation";
 describe("input boundaries", () => {
   it.each([
@@ -82,3 +83,94 @@ describe("input boundaries", () => {
     );
   });
 });
+
+describe.each(["development", "production"])(
+  "client URLs on a %s SSO server",
+  (serverEnvironment) => {
+    afterEach(() => vi.unstubAllEnvs());
+    const input = {
+      name: "Test client",
+      environment: "development",
+      redirectUris: ["https://app.example.test/callback"],
+      postLogoutRedirectUris: ["https://app.example.test/"],
+    };
+
+    it.each(["development", "staging", "production"])(
+      "enforces %s client policy for callbacks and logout",
+      (environment) => {
+        vi.stubEnv("NODE_ENV", serverEnvironment);
+        expect(clientInput.safeParse({ ...input, environment }).success).toBe(
+          true,
+        );
+        for (const field of [
+          "redirectUris",
+          "postLogoutRedirectUris",
+        ] as const) {
+          for (const host of ["localhost", "127.0.0.1", "[::1]"]) {
+            expect(
+              clientInput.safeParse({
+                ...input,
+                environment,
+                [field]: [`http://${host}:3001/callback`],
+              }).success,
+            ).toBe(environment === "development");
+          }
+        }
+      },
+    );
+
+    it.each([
+      "http://app.example.test/callback",
+      "http://192.168.1.10/callback",
+      "http://localhost.evil.test/callback",
+      "http://localhost./callback",
+      "http://127.1/callback",
+      "http://2130706433/callback",
+      "http://0x7f000001/callback",
+      "http://127.0.0.2/callback",
+      "http://[::ffff:127.0.0.1]/callback",
+      "http://user:secret@localhost/callback",
+      "http://localhost:3001/callback#fragment",
+      "http://localhost:3001/callback#",
+      "http://localhost:3001/*",
+      "http://local\nhost:3001/callback",
+      "http://localhost\\evil/callback",
+      "https://*.example.test/callback",
+      "https://user:secret@app.example.test/callback",
+      "https://app.example.test/callback#fragment",
+      "javascript:alert(1)",
+    ])("rejects unsafe development URL %s", (uri) => {
+      vi.stubEnv("NODE_ENV", serverEnvironment);
+      for (const field of ["redirectUris", "postLogoutRedirectUris"] as const) {
+        expect(
+          clientInput.safeParse({ ...input, [field]: [uri] }).success,
+        ).toBe(false);
+      }
+    });
+
+    it("requires an explicit valid environment", () => {
+      for (const environment of [undefined, "dev", "unknown"]) {
+        expect(clientInput.safeParse({ ...input, environment }).success).toBe(
+          false,
+        );
+      }
+    });
+
+    it("keeps platform and resource launch URLs restricted on production servers", () => {
+      vi.stubEnv("NODE_ENV", "production");
+      expect(isSafeUrl("http://localhost:3001/login")).toBe(false);
+      for (const type of ["SSO", "LINK"]) {
+        expect(
+          platformInput.safeParse({
+            name: "Test",
+            slug: "test",
+            description: "",
+            icon: "book",
+            type,
+            launchUrl: "http://localhost:3001/login",
+          }).success,
+        ).toBe(false);
+      }
+    });
+  },
+);

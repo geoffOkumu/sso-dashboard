@@ -10,7 +10,7 @@ import {
   inviteInput,
   platformInput,
   roleKey,
-  safeUrl,
+  clientInput,
   uuid,
 } from "@/lib/validation";
 import { rateLimit } from "@/lib/rate-limit";
@@ -439,22 +439,8 @@ export async function POST(request: Request, context: Context) {
         );
       }
       if (action === "clients") {
-        const input = z
-          .object({
-            name: z.string().min(2).max(80),
-            environment: z.enum(["development", "staging", "production"]),
-            redirectUris: z.array(safeUrl).min(1).max(10),
-            postLogoutRedirectUris: z.array(safeUrl).max(10).default([]),
-          })
-          .parse(body);
+        const input = clientInput.parse(body);
         await db.platform.findUniqueOrThrow({ where: { id } });
-        if (
-          input.environment === "production" &&
-          [...input.redirectUris, ...input.postLogoutRedirectUris].some(
-            (uri) => !uri.startsWith("https://"),
-          )
-        )
-          throw new HttpError(400, "Production client URLs must use HTTPS");
         const client = await auth.api.adminCreateOAuthClient({
           headers: request.headers,
           body: {
@@ -465,11 +451,7 @@ export async function POST(request: Request, context: Context) {
             grant_types: ["authorization_code"],
             response_types: ["code"],
             token_endpoint_auth_method: "client_secret_basic",
-            application_type: input.redirectUris.some(
-              (uri) => new URL(uri).protocol === "http:",
-            )
-              ? "native"
-              : "web",
+            application_type: input.applicationType,
             subject_type: "public",
             require_pkce: true,
             skip_consent: true,
@@ -506,27 +488,14 @@ export async function POST(request: Request, context: Context) {
         where: { id: uuid.parse(id) },
       });
       if (action === "settings") {
-        const input = z
-          .object({
-            name: z.string().min(2).max(80),
-            environment: z.enum(["development", "staging", "production"]),
-            redirectUris: z.array(safeUrl).min(1).max(10),
-            postLogoutRedirectUris: z.array(safeUrl).max(10).default([]),
-          })
-          .parse(body);
-        if (
-          input.environment === "production" &&
-          [...input.redirectUris, ...input.postLogoutRedirectUris].some(
-            (uri) => !uri.startsWith("https://"),
-          )
-        )
-          throw new HttpError(400, "Production client URLs must use HTTPS");
+        const input = clientInput.parse(body);
         await auth.api.adminUpdateOAuthClient({
           headers: request.headers,
           body: {
             client_id: client.oauthClientId,
             update: {
               client_name: input.name,
+              application_type: input.applicationType,
               redirect_uris: input.redirectUris,
               post_logout_redirect_uris: input.postLogoutRedirectUris,
             },

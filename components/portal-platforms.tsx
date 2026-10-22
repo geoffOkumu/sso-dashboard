@@ -886,7 +886,7 @@ function ClientForm({
       </Field>
       <Field
         label="Exact callback URLs"
-        hint="One per line. No wildcards. These must match your application's OIDC callback route."
+        hint="One per line, matching your callback route exactly. Development allows HTTP on localhost, 127.0.0.1 or [::1], even with live SSO. Staging and Production require HTTPS."
       >
         <textarea
           name="redirectUris"
@@ -896,7 +896,10 @@ function ClientForm({
           placeholder="http://localhost:3001/callback"
         />
       </Field>
-      <Field label="Post-logout URLs (optional)">
+      <Field
+        label="Post-logout URLs (optional)"
+        hint="The same environment restrictions apply as for callback URLs."
+      >
         <textarea
           name="postLogoutRedirectUris"
           defaultValue={existingClient?.oauthClient.postLogoutRedirectUris?.join(

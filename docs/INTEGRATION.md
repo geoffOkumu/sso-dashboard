@@ -7,7 +7,7 @@ For public documentation with endpoint URLs and examples tailored to the running
 1. Bootstrap/sign in to Permit Kit and finish MFA enrollment.
 2. In **Platforms**, add a name, slug, icon and launch URL. Use the tool's `/login` route as the launch URL. Saving this URL alone does not integrate SSO.
 3. Add permission keys such as `contacts.read`, `contacts.write` and `contacts.delete`. Create roles and select their permissions.
-4. Register a client for each environment. Enter exact callback URLs and optional post-logout URLs. In production all URLs must use HTTPS. Copy the provider-generated secret immediately; only its hash is stored centrally. Client IDs are not secrets. Secrets belong exclusively in the tool's server environment.
+4. Register a client for each environment. Enter exact callback URLs and optional post-logout URLs. Staging and Production clients require HTTPS URLs. Development clients may also use HTTP on the exact loopback hosts `localhost`, `127.0.0.1` or `[::1]`, even when the SSO server runs in production. This applies to callbacks and post-logout URLs; wildcard URLs are never allowed. Copy the provider-generated secret immediately; only its hash is stored centrally. Client IDs are not secrets. Secrets belong exclusively in the tool's server environment.
 5. Assign employee roles in **Access**, optionally with an expiration. A superadmin has implicit full access after MFA.
 
 ## Run the complete examples
@@ -21,6 +21,24 @@ pnpm dev:analytics    # independent analytics, localhost:3002
 ```
 
 Open CRM directly; it starts the provider login flow. Once signed in, open Analytics. If the user has access, the same central session authenticates the second tool without another credential prompt. Each app has a separate cookie and SQLite database under its `.data/` directory. Tokens are server-side. The launcher and direct tool URLs use exactly the same real OIDC flow.
+
+## Local development with live SSO
+
+On the live deployment, register a separate client with **Environment: Development** and the exact callback `http://localhost:3001/callback` (optionally `http://localhost:3001/` for post-logout). Assign your user access to the platform. Keep the platform's shared launch URL pointed at its deployed application; start the local application directly for development.
+
+For the CRM demo, set `apps/demo-crm/.env`:
+
+```dotenv
+APP_URL=http://localhost:3001
+PORT=3001
+OIDC_ISSUER=https://your-live-sso.example/api/auth
+OIDC_CLIENT_ID=your-development-client-id
+OIDC_CLIENT_SECRET=your-development-client-secret
+```
+
+Run `pnpm dev:crm` and open `http://localhost:3001`. The browser signs in on the live SSO deployment and redirects back to localhost; the local server exchanges the authorization code and checks permissions against the live deployment. No tunnel or local identity server is needed. Keep the local app in development mode and its client secret on the server.
+
+Callbacks match exactly, including hostname, port and path. Other HTTP hosts, LAN addresses, wildcard hosts, credentials and fragments are rejected. Changing a client to Staging or Production requires replacing all HTTP callback and post-logout URLs with HTTPS URLs in the same edit. Platform launch URLs and directory links retain their existing HTTPS restrictions on production SSO deployments.
 
 ## Next.js integration
 

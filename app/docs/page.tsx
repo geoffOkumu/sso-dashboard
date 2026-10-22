@@ -125,8 +125,11 @@ export default async function DocsPage() {
               </li>
               <li>
                 Register a separate confidential OIDC client for each
-                environment with exact callback URLs. Use HTTPS in production.
-                Copy the generated secret immediately; it is shown once.
+                environment with exact callback URLs. Staging and Production
+                require HTTPS. Development also allows HTTP on localhost,
+                127.0.0.1 or [::1], even with a live SSO deployment. The same
+                rules apply to post-logout URLs. Copy the generated secret
+                immediately; it is shown once.
               </li>
               <li>
                 Assign employees a platform role in <strong>Access</strong>.
