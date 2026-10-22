@@ -18,6 +18,8 @@ Superadmins must finish verified TOTP enrollment before privileged operations or
 
 ## Authorization order
 
+Platforms have a fixed `SSO` or `LINK` type. The migration defaults existing platforms to `SSO`, preserving assignments and client registrations. Enabled `LINK` entries are shared directory resources: `/api/me` lists them for any active authenticated user without an assignment, with no access decision attached. Disabling a link hides it from the directory; the destination controls its own access. Directory resources cannot register clients, roles or permissions through the administration API, and the authorization policy denies them even for superadmins. The following order applies to SSO apps.
+
 1. Require authenticated subject and live central session.
 2. Deny non-active users.
 3. Deny disabled platforms and client registrations.

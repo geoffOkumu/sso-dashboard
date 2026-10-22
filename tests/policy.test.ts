@@ -18,6 +18,18 @@ const base: PolicyInput = {
   },
 };
 describe("authoritative platform policy", () => {
+  it.each(["EMPLOYEE", "SUPERADMIN"])(
+    "does not grant SSO authorization for directory links to %s",
+    (globalRole) => {
+      expect(
+        decideAccess({
+          ...base,
+          user: { ...base.user!, globalRole, twoFactorEnabled: true },
+          platform: { id: "handbook", enabled: true, type: "LINK" },
+        }).reason,
+      ).toBe("directory_resource");
+    },
+  );
   it("defaults to deny without identity or assignment", () => {
     expect(decideAccess({ ...base, user: null }).allowed).toBe(false);
     expect(decideAccess({ ...base, assignment: null }).allowed).toBe(false);

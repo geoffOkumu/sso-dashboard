@@ -151,9 +151,14 @@ export async function GET(request: Request, context: Context) {
       return json({
         items: await db.platform.findMany({
           where: {
+            type: z
+              .enum(["SSO", "LINK"])
+              .optional()
+              .parse(query.get("type") || undefined),
             OR: [
               { name: { contains: q, mode: "insensitive" } },
               { slug: { contains: q, mode: "insensitive" } },
+              { description: { contains: q, mode: "insensitive" } },
             ],
           },
           include,
@@ -298,9 +303,22 @@ export async function POST(request: Request, context: Context) {
     }
     if (resource === "platforms") {
       if (!id || !action) {
-        const input = platformInput.parse(body);
         return json(
           await adminTransaction(user.id, async (tx) => {
+            const existing = id
+              ? await tx.platform.findUniqueOrThrow({
+                  where: { id: uuid.parse(id) },
+                })
+              : null;
+            const input = platformInput.parse({
+              ...body,
+              type: body.type ?? existing?.type ?? "SSO",
+            });
+            if (existing && existing.type !== input.type)
+              throw new HttpError(
+                400,
+                "Platform type cannot be changed. Add a new platform or resource instead.",
+              );
             const platform = id
               ? await tx.platform.update({
                   where: { id: uuid.parse(id) },
@@ -313,7 +331,7 @@ export async function POST(request: Request, context: Context) {
               id ? "platform.updated" : "platform.created",
               platform.id,
               platform.id,
-              { enabled: platform.enabled },
+              { enabled: platform.enabled, type: platform.type },
             );
             return platform;
           }),
@@ -321,6 +339,12 @@ export async function POST(request: Request, context: Context) {
         );
       }
       uuid.parse(id);
+      const target = await db.platform.findUniqueOrThrow({ where: { id } });
+      if (target.type === "LINK")
+        throw new HttpError(
+          400,
+          "Directory resources do not use SSO clients, roles or permissions",
+        );
       if (action === "permissions") {
         const input = z
           .object({ key: roleKey, description: z.string().max(200) })

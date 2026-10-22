@@ -78,9 +78,17 @@ Public integration documentation is available at `/docs`, with links from sign-i
 
 Bootstrap accepts environment input (`BOOTSTRAP_EMAIL`, `BOOTSTRAP_NAME`, `BOOTSTRAP_PASSWORD`) or prompts with a hidden password. It trusts the installation operator to own the supplied email. After the first administrator exists, use the portal to grant further superadmin roles.
 
+## Add company resources without SSO
+
+In **Platforms → Add platform**, choose **Directory resource (no SSO)**. Enter a name, slug, description, icon and direct HTTPS URL, then select **Save resource**. Document section links (URL fragments) are supported. Enabled resources appear in **Apps & resources** for every active employee without role assignments or client credentials. Search finds both assigned apps and shared resources.
+
+Use **Resource settings** to edit a link or turn off **Show in directory** to hide it. The destination service manages its own access; listing a resource does not sign users in or grant access there. Entry type is fixed after creation. Existing platforms retain their SSO behavior.
+
+When upgrading an existing installation, run `pnpm db:migrate` and `pnpm db:generate` before starting the updated app.
+
 ## Security behavior
 
-- Employees see only assigned, enabled apps. Superadmins with MFA see all enabled platforms, including future ones.
+- Employees see assigned, enabled SSO apps and all enabled directory resources. Superadmins with MFA see all enabled SSO apps, including future ones. Directory links never grant SSO authorization.
 - Role/permission checks execute on servers for protected reads, APIs and mutations. Cross-platform relationships are constrained in PostgreSQL.
 - Confidential client credentials and tokens remain on servers. Each demo has its own random HttpOnly session cookie and SQLite store, keyed by validated issuer and subject.
 - Every protected tool operation checks central policy. Positive cache is 30 seconds by default, capped at **60 seconds**. Sensitive writes always bypass it. Outages fail closed after cache expiry.

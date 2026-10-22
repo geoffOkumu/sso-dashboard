@@ -60,7 +60,7 @@ test("employee sees only assigned apps and cannot invoke admin APIs", async ({
   await page.goto("/sign-in");
   await login(page);
   await expect(
-    page.getByRole("heading", { name: "My apps", exact: true }),
+    page.getByRole("heading", { name: "Apps & resources", exact: true }),
   ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Customer CRM" }),
@@ -85,7 +85,7 @@ test("unassigned employee sees no apps and is denied when opening CRM directly",
   await page.goto("/sign-in");
   await login(page, "unassigned");
   await expect(
-    page.getByText("Your workspace is ready for applications"),
+    page.getByText("Your workspace is ready for apps and resources"),
   ).toBeVisible();
   await page.goto("http://localhost:3101/");
   await expect(page.locator("body")).toContainText("do not have access");
@@ -513,5 +513,91 @@ test("client registration and rotation show secrets once, never in lists", async
     { headers: mutationHeaders, data: { enabled: false } },
   );
   expect(disabled.ok()).toBe(true);
+  await admin.close();
+});
+
+test("admin adds a directory resource that unassigned employees can discover", async ({
+  browser,
+  page,
+}) => {
+  const admin = await adminContext(browser);
+  const adminPage = await admin.newPage();
+  await adminPage.goto("/platforms");
+  await adminPage
+    .getByRole("button", { name: "Add platform", exact: true })
+    .first()
+    .click();
+  await adminPage.getByLabel("Type", { exact: false }).selectOption("LINK");
+  await adminPage
+    .getByLabel("Resource name", { exact: true })
+    .fill("Company handbook");
+  await adminPage.getByLabel("Slug", { exact: true }).fill("company-handbook");
+  await adminPage
+    .getByLabel("Description", { exact: true })
+    .fill("Policies and useful team resources");
+  await adminPage
+    .getByLabel("Launch URL", { exact: false })
+    .fill("https://docs.company.test/handbook#leave");
+  await adminPage
+    .getByRole("button", { name: "Save resource", exact: true })
+    .click();
+  await expect(adminPage.getByRole("dialog")).not.toBeVisible();
+  await adminPage
+    .getByRole("button", { name: "Company handbook company-handbook" })
+    .click();
+  await expect(
+    adminPage.getByRole("button", { name: "Resource settings", exact: true }),
+  ).toBeVisible();
+  await expect(
+    adminPage.getByRole("button", { name: "OIDC clients", exact: true }),
+  ).not.toBeVisible();
+  await page.goto("/sign-in");
+  await login(page, "unassigned");
+  await page.getByPlaceholder("Search apps and resources...").fill("handbook");
+  const resource = page
+    .getByRole("link")
+    .filter({ has: page.getByRole("heading", { name: "Company handbook" }) });
+  await expect(resource).toHaveAttribute(
+    "href",
+    "https://docs.company.test/handbook#leave",
+  );
+  await expect(resource).toContainText("Directory resource");
+  await expect(resource).toContainText("Open resource");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(resource).toBeVisible();
+  await expect(page.getByRole("complementary")).not.toBeInViewport();
+  await page.screenshot({
+    path: ".generated/directory-mobile.png",
+    fullPage: true,
+  });
+  await adminPage
+    .getByRole("button", { name: "Resource settings", exact: true })
+    .click();
+  await adminPage
+    .getByLabel("Resource name", { exact: true })
+    .fill("Team handbook");
+  await adminPage
+    .getByRole("button", { name: "Save resource", exact: true })
+    .click();
+  await expect(
+    adminPage.getByRole("heading", { name: "Team handbook", exact: true }),
+  ).toBeVisible();
+  await adminPage.screenshot({
+    path: ".generated/directory-admin.png",
+    fullPage: true,
+  });
+  await adminPage
+    .getByRole("button", { name: "Resource settings", exact: true })
+    .click();
+  await adminPage.getByLabel("Show in directory").uncheck();
+  adminPage.once("dialog", (dialog) => dialog.accept());
+  await adminPage
+    .getByRole("button", { name: "Save resource", exact: true })
+    .click();
+  await expect(adminPage.getByText("Hidden", { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "Team handbook", exact: true }),
+  ).not.toBeVisible();
   await admin.close();
 });

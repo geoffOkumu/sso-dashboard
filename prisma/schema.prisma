@@ -296,6 +296,11 @@ model RateLimit {
   @@map("rateLimit")
 }
 
+enum PlatformType {
+  SSO
+  LINK
+}
+
 model Platform {
   id           String               @id @default(uuid()) @db.Uuid
   name         String
@@ -303,6 +308,7 @@ model Platform {
   description  String
   icon         String               @default("layers")
   launchUrl    String
+  type         PlatformType         @default(SSO)
   enabled      Boolean              @default(true)
   displayOrder Int                  @default(0)
   createdAt    DateTime             @default(now())

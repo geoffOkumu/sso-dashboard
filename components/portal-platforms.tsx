@@ -61,7 +61,7 @@ export function Platforms() {
         <>
           <PageTitle
             title="Platforms"
-            description="Connect and configure your company's internal applications."
+            description="Manage your company's applications, links and shared resources."
           >
             <Button onClick={() => setEditing("new")}>
               <Plus size={14} />
@@ -92,6 +92,7 @@ export function Platforms() {
                   <thead>
                     <tr>
                       <th>PLATFORM</th>
+                      <th>TYPE</th>
                       <th>STATUS</th>
                       <th>CLIENTS</th>
                       <th>ROLES</th>
@@ -117,18 +118,27 @@ export function Platforms() {
                           </button>
                         </td>
                         <td>
+                          <Badge>
+                            {p.type === "LINK"
+                              ? "Directory resource"
+                              : "SSO app"}
+                          </Badge>
+                        </td>
+                        <td>
                           <Badge tone={p.enabled ? "green" : "neutral"}>
                             {p.enabled ? "Enabled" : "Disabled"}
                           </Badge>
                         </td>
                         <td className="text-muted-foreground">
-                          {p.clients.length}
+                          {p.type === "LINK" ? "—" : p.clients.length}
                         </td>
                         <td className="text-muted-foreground">
-                          {p.roles.length}
+                          {p.type === "LINK" ? "—" : p.roles.length}
                         </td>
                         <td className="text-muted-foreground">
-                          {p._count?.assignments || 0}
+                          {p.type === "LINK"
+                            ? "Everyone"
+                            : p._count?.assignments || 0}
                         </td>
                         <td>
                           <Button
@@ -149,8 +159,8 @@ export function Platforms() {
           ) : (
             <Panel>
               <Empty
-                title="Connect your first platform"
-                description="Register an internal tool, define its permissions, and configure an OIDC client."
+                title="Add your first app or resource"
+                description="Connect an app with SSO or add a direct link to a company resource."
               >
                 <Button
                   className="mt-4"
@@ -187,7 +197,8 @@ function PlatformForm({
   done: () => void;
 }) {
   const [error, setError] = useState(""),
-    [busy, setBusy] = useState(false);
+    [busy, setBusy] = useState(false),
+    [type, setType] = useState<Platform["type"]>(platform?.type ?? "SSO");
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
@@ -196,13 +207,14 @@ function PlatformForm({
       platform &&
       platform.enabled !== enabled &&
       !confirm(
-        `${enabled ? "Enable" : "Disable"} ${platform.name}? Disabled platforms deny access to everyone, including superadmins.`,
+        `${enabled ? "Enable" : "Disable"} ${platform.name}? ${type === "LINK" ? "Disabled resources are hidden from the directory." : "Disabled platforms deny access to everyone, including superadmins."}`,
       )
     )
       return;
     setBusy(true);
     try {
       await api(`/api/admin/platforms${platform ? `/${platform.id}` : ""}`, {
+        type,
         name: f.get("name"),
         slug: f.get("slug"),
         description: f.get("description"),
@@ -221,15 +233,39 @@ function PlatformForm({
   return (
     <form onSubmit={submit} className="space-y-4">
       {error && <ErrorNotice message={error} />}
+      <Field
+        label="Type"
+        hint={
+          platform
+            ? "Type is fixed after creation. Add a new entry to use a different type."
+            : "Choose how your team will open this app or resource."
+        }
+      >
+        <select
+          value={type}
+          onChange={(e) => setType(e.target.value as Platform["type"])}
+          disabled={!!platform}
+          className="w-full"
+        >
+          <option value="SSO">SSO app</option>
+          <option value="LINK">Directory resource (no SSO)</option>
+        </select>
+      </Field>
+      {type === "LINK" && (
+        <p className="rounded-lg bg-muted p-3 text-xs leading-5 text-muted-foreground">
+          Visible to all active employees. Opens a direct link without SSO setup
+          or assignments. Access at the destination is managed by that service.
+        </p>
+      )}
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Platform name">
+        <Field label={type === "LINK" ? "Resource name" : "Platform name"}>
           <Input
             name="name"
             required
             minLength={2}
             maxLength={80}
             defaultValue={platform?.name}
-            placeholder="Customer CRM"
+            placeholder={type === "LINK" ? "Company handbook" : "Customer CRM"}
           />
         </Field>
         <Field label="Slug">
@@ -252,14 +288,22 @@ function PlatformForm({
       </Field>
       <Field
         label="Launch URL"
-        hint="Use the tool's OIDC login entry point. HTTPS is required outside loopback development."
+        hint={
+          type === "LINK"
+            ? "Link to a website, document or other resource. HTTPS is required outside loopback development."
+            : "Use the tool's OIDC login entry point. HTTPS is required outside loopback development."
+        }
       >
         <Input
           name="launchUrl"
           type="url"
           required
           defaultValue={platform?.launchUrl}
-          placeholder="https://crm.company.com/login"
+          placeholder={
+            type === "LINK"
+              ? "https://docs.company.com/handbook"
+              : "https://crm.company.com/login"
+          }
         />
       </Field>
       <div className="grid grid-cols-2 gap-3">
@@ -301,10 +345,10 @@ function PlatformForm({
           type="checkbox"
           defaultChecked={platform?.enabled ?? true}
         />
-        Platform enabled
+        {type === "LINK" ? "Show in directory" : "Platform enabled"}
       </label>
       <Button className="w-full" disabled={busy}>
-        {busy ? "Saving…" : "Save platform"}
+        {busy ? "Saving…" : type === "LINK" ? "Save resource" : "Save platform"}
       </Button>
     </form>
   );
@@ -352,6 +396,38 @@ function PlatformDetails({
       setBusy(false);
     }
   }
+  if (platform.type === "LINK")
+    return (
+      <>
+        <PageTitle title={platform.name} description={platform.description}>
+          <Button variant="outline" onClick={edit}>
+            <Settings2 size={14} />
+            Resource settings
+          </Button>
+        </PageTitle>
+        <Panel className="max-w-3xl p-6">
+          <div className="mb-4 flex items-center gap-3">
+            <AppIcon icon={platform.icon} />
+            <Badge>Directory resource</Badge>
+            <Badge tone={platform.enabled ? "green" : "neutral"}>
+              {platform.enabled ? "Visible to everyone" : "Hidden"}
+            </Badge>
+          </div>
+          <p className="mb-4 text-xs leading-6 text-muted-foreground">
+            This resource opens directly and is listed for all active employees
+            when enabled. No SSO integration or role assignment is required.
+            Access at the destination is managed by that service.
+          </p>
+          <a
+            href={platform.launchUrl}
+            className="flex items-center gap-2 break-all text-xs text-primary"
+          >
+            {platform.launchUrl}
+            <ArrowUpRight size={14} className="shrink-0" />
+          </a>
+        </Panel>
+      </>
+    );
   return (
     <>
       <PageTitle title={platform.name} description={platform.description}>

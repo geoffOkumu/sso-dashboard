@@ -74,7 +74,7 @@ export function UserManagement() {
     version,
   );
   const platforms = useData<{ items: Platform[] }>(
-    "/api/admin/platforms",
+    "/api/admin/platforms?type=SSO",
     version,
   );
   function done() {
@@ -653,7 +653,10 @@ export function AccessManagement() {
       `/api/admin/users?q=${encodeURIComponent(q)}&page=${page}`,
       version,
     ),
-    platforms = useData<{ items: Platform[] }>("/api/admin/platforms", version);
+    platforms = useData<{ items: Platform[] }>(
+      "/api/admin/platforms?type=SSO",
+      version,
+    );
   return (
     <>
       <PageTitle

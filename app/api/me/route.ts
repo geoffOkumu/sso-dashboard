@@ -13,10 +13,13 @@ export async function GET(request: Request) {
       await Promise.all(
         platforms.map(async (platform) => ({
           ...platform,
-          access: await currentAccess(user.id, platform.id),
+          access:
+            platform.type === "LINK"
+              ? null
+              : await currentAccess(user.id, platform.id),
         })),
       )
-    ).filter((p) => p.access.allowed);
+    ).filter((p) => p.type === "LINK" || p.access?.allowed);
     const sessions = await db.session.findMany({
       where: { userId: user.id, expiresAt: { gt: new Date() } },
       select: {

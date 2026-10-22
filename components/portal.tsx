@@ -43,7 +43,7 @@ import { UserManagement, AccessManagement, AuditLogs } from "./portal-admin";
 import { Platforms } from "./portal-platforms";
 import { Account, Security } from "./portal-account";
 const employeeNav = [
-  { href: "/", name: "My apps", icon: LayoutGrid },
+  { href: "/", name: "Apps & resources", icon: LayoutGrid },
   { href: "/account", name: "Account", icon: UserRound },
   { href: "/security", name: "Security & sessions", icon: ShieldCheck },
   { href: "/docs", name: "Integration docs", icon: BookOpen },
@@ -305,8 +305,8 @@ function MyApps({ me }: { me: Me }) {
   return (
     <>
       <PageTitle
-        title="My apps"
-        description="Your tools, together in one place."
+        title="Apps & resources"
+        description="Your company's tools and resources, together in one place."
       />
       <div className="relative mb-8 overflow-hidden rounded-xl border border-primary-border bg-primary-soft px-7 py-7 sm:px-8">
         <div className="relative z-10">
@@ -317,14 +317,14 @@ function MyApps({ me }: { me: Me }) {
             Good to see you, {me.user.name.split(" ")[0]}.
           </h2>
           <p className="mt-2 max-w-md text-xs leading-6 text-muted-foreground">
-            Everything you need to do your best work. Open an application below
-            and pick up where you left off.
+            Everything you need to do your best work. Open an app or resource
+            below and pick up where you left off.
           </p>
           <div className="mt-5 flex items-center gap-2 text-[11px] text-primary">
             <ShieldCheck size={14} />
             <span>
-              One account. Secure access to {me.apps.length} application
-              {me.apps.length !== 1 ? "s" : ""}.
+              Apps and resources in one place. {me.apps.length} available to
+              you.
             </span>
           </div>
         </div>
@@ -337,13 +337,13 @@ function MyApps({ me }: { me: Me }) {
       </div>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-2">
-          <h2 className="text-sm font-semibold">Your applications</h2>
+          <h2 className="text-sm font-semibold">Your apps & resources</h2>
           <Badge>{me.apps.length}</Badge>
         </div>
         <SearchBox
           value={search}
           onChange={setSearch}
-          placeholder="Search applications..."
+          placeholder="Search apps and resources..."
         />
       </div>
       {apps.length ? (
@@ -366,13 +366,15 @@ function MyApps({ me }: { me: Me }) {
                 {app.description}
               </p>
               <div className="flex items-center justify-between border-t border-border pt-3">
-                <Badge tone="blue">
-                  {app.access?.role === "superadmin"
-                    ? "Full access"
-                    : app.access?.role}
+                <Badge tone={app.type === "LINK" ? "neutral" : "blue"}>
+                  {app.type === "LINK"
+                    ? "Directory resource"
+                    : app.access?.role === "superadmin"
+                      ? "Full access"
+                      : app.access?.role}
                 </Badge>
                 <span className="flex items-center gap-1 text-[11px] font-medium text-primary">
-                  Open application
+                  {app.type === "LINK" ? "Open resource" : "Open application"}
                   <ArrowRight size={12} />
                 </span>
               </div>
@@ -384,13 +386,13 @@ function MyApps({ me }: { me: Me }) {
           <Empty
             title={
               search
-                ? "No matching applications"
-                : "Your workspace is ready for applications"
+                ? "No matching apps or resources"
+                : "Your workspace is ready for apps and resources"
             }
             description={
               search
                 ? "Try a different name or keyword."
-                : "Your administrator can assign applications to your account. They'll appear here once access is granted."
+                : "Your administrator can assign apps to your account and add shared resources for everyone."
             }
           />
         </Panel>
@@ -398,7 +400,7 @@ function MyApps({ me }: { me: Me }) {
       <div className="mt-7 flex items-start gap-3 rounded-lg border border-dashed border-slate-200 p-4">
         <CircleHelp size={17} className="mt-0.5 text-muted-foreground" />
         <div>
-          <p className="text-xs font-medium">Missing an application?</p>
+          <p className="text-xs font-medium">Missing an app or resource?</p>
           <p className="mt-1 text-[11px] text-muted-foreground">
             Contact your company administrator to request access to another
             tool.
@@ -441,7 +443,7 @@ function Overview() {
             icon: Users,
           },
           {
-            title: "Connected platforms",
+            title: "Apps & resources",
             value: data.platforms,
             sub: "Enabled in your workspace",
             icon: Layers3,
@@ -538,8 +540,7 @@ function Overview() {
           <Panel className="p-5">
             <h2 className="mb-3 text-sm font-semibold">Build your workspace</h2>
             <p className="mb-5 text-xs leading-6 text-muted-foreground">
-              Connect an internal tool and give your team one less password to
-              remember.
+              Connect an internal tool or add a shared resource for your team.
             </p>
             <Button variant="outline" asChild className="w-full">
               <Link href="/platforms">

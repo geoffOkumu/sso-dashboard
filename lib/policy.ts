@@ -7,7 +7,7 @@ export type PolicyInput = {
     securityVersion: number;
     twoFactorEnabled?: boolean | null;
   } | null;
-  platform: { id: string; enabled: boolean } | null;
+  platform: { id: string; enabled: boolean; type?: "SSO" | "LINK" } | null;
   clientEnabled?: boolean;
   assignment?: {
     revokedAt: Date | null;
@@ -40,6 +40,7 @@ export function decideAccess(input: PolicyInput): Decision {
   if (user.status !== "ACTIVE") return deny("account_inactive");
   if (!platform?.enabled || input.clientEnabled === false)
     return deny("platform_disabled");
+  if (platform.type === "LINK") return deny("directory_resource");
   if (
     input.sessionVersion !== undefined &&
     input.sessionVersion !== user.securityVersion

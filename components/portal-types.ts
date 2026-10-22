@@ -19,6 +19,7 @@ export type Client = {
 };
 export type Platform = {
   id: string;
+  type: "SSO" | "LINK";
   name: string;
   slug: string;
   description: string;
@@ -30,7 +31,7 @@ export type Platform = {
   permissions: Permission[];
   clients: Client[];
   _count?: { assignments: number };
-  access?: { role: string; permissions: string[] };
+  access?: { role: string; permissions: string[] } | null;
 };
 export type Assignment = {
   id: string;

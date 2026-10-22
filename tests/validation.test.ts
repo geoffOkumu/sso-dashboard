@@ -46,4 +46,39 @@ describe("input boundaries", () => {
         globalRole: "owner",
       }).success,
     ).toBe(false));
+  const resource = {
+    name: "Company handbook",
+    slug: "handbook",
+    description: "Policies",
+    icon: "book",
+    type: "LINK",
+    launchUrl: "https://docs.company.test/handbook#leave",
+  };
+  it("allows document sections for resources without relaxing SSO URLs", () => {
+    expect(platformInput.safeParse(resource).success).toBe(true);
+    expect(platformInput.safeParse({ ...resource, type: "SSO" }).success).toBe(
+      false,
+    );
+    expect(
+      platformInput.parse({
+        ...resource,
+        type: undefined,
+        launchUrl: "https://crm.test/login",
+      }).type,
+    ).toBe("SSO");
+    expect(
+      platformInput.safeParse({ ...resource, type: "unknown" }).success,
+    ).toBe(false);
+  });
+  it.each([
+    "javascript:alert(1)",
+    "data:text/html,hello",
+    "http://company.test/docs",
+    "https://user:secret@company.test/docs",
+    "https://*.company.test/docs",
+  ])("rejects unsafe resource URL %s", (launchUrl) => {
+    expect(platformInput.safeParse({ ...resource, launchUrl }).success).toBe(
+      false,
+    );
+  });
 });

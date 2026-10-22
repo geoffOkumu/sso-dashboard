@@ -33,15 +33,42 @@ export const safeUrl = z
     isSafeUrl,
     "Use HTTPS or a loopback development URL, without wildcards, credentials or fragments.",
   );
-export const platformInput = z.object({
-  name: z.string().trim().min(2).max(80),
-  slug: z.string().regex(/^[a-z][a-z0-9-]{1,49}$/),
-  description: z.string().trim().max(200),
-  icon: z.enum(iconKeys),
-  launchUrl: safeUrl,
-  enabled: z.boolean().default(true),
-  displayOrder: z.number().int().min(0).max(10000).default(0),
-});
+// Directory links may point to a document section; OAuth URLs stay stricter.
+export function isSafeResourceUrl(value: string) {
+  try {
+    const url = new URL(value);
+    url.hash = "";
+    return isSafeUrl(url.href) && !value.includes("*");
+  } catch {
+    return false;
+  }
+}
+export const platformInput = z
+  .object({
+    type: z.enum(["SSO", "LINK"]).default("SSO"),
+    name: z.string().trim().min(2).max(80),
+    slug: z.string().regex(/^[a-z][a-z0-9-]{1,49}$/),
+    description: z.string().trim().max(200),
+    icon: z.enum(iconKeys),
+    launchUrl: z.string().url(),
+    enabled: z.boolean().default(true),
+    displayOrder: z.number().int().min(0).max(10000).default(0),
+  })
+  .superRefine((input, ctx) => {
+    const valid =
+      input.type === "LINK"
+        ? isSafeResourceUrl(input.launchUrl)
+        : isSafeUrl(input.launchUrl);
+    if (!valid)
+      ctx.addIssue({
+        code: "custom",
+        path: ["launchUrl"],
+        message:
+          input.type === "LINK"
+            ? "Use HTTPS or a loopback development URL, without wildcards or credentials."
+            : "Use HTTPS or a loopback development URL, without wildcards, credentials or fragments.",
+      });
+  });
 export const roleKey = z.string().regex(/^[a-z][a-z0-9_.-]{1,79}$/);
 export const uuid = z.string().uuid();
 export const grantInput = z.object({
