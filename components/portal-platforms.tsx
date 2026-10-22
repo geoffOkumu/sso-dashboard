@@ -8,6 +8,7 @@ import {
   RotateCw,
   Settings2,
   Check,
+  Trash2,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -30,6 +31,7 @@ export function Platforms() {
   const [q, setQ] = useState(""),
     [version, setVersion] = useState(0),
     [selected, setSelected] = useState<string | null>(null),
+    [deleting, setDeleting] = useState<Platform | null>(null),
     [editing, setEditing] = useState<Platform | "new" | null>(null);
   const { data, error } = useData<{ items: Platform[] }>(
     `/api/admin/platforms?q=${encodeURIComponent(q)}`,
@@ -55,6 +57,7 @@ export function Platforms() {
             platform={platform}
             refresh={() => setVersion((v) => v + 1)}
             edit={() => setEditing(platform)}
+            remove={() => setDeleting(platform)}
           />
         </>
       ) : (
@@ -175,6 +178,17 @@ export function Platforms() {
           )}
         </>
       )}
+      {deleting && (
+        <DeletePlatform
+          platform={deleting}
+          close={() => setDeleting(null)}
+          done={() => {
+            setDeleting(null);
+            setSelected(null);
+            done();
+          }}
+        />
+      )}
       {editing && (
         <Modal
           title={editing === "new" ? "Add platform" : "Platform settings"}
@@ -187,6 +201,58 @@ export function Platforms() {
         </Modal>
       )}
     </>
+  );
+}
+function DeletePlatform({
+  platform,
+  close,
+  done,
+}: {
+  platform: Platform;
+  close: () => void;
+  done: () => void;
+}) {
+  const [busy, setBusy] = useState(false),
+    [error, setError] = useState("");
+  const label = platform.type === "LINK" ? "resource" : "platform";
+  async function remove() {
+    setBusy(true);
+    setError("");
+    try {
+      await api(`/api/admin/platforms/${platform.id}`, undefined, "DELETE");
+      done();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : `Could not delete ${label}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Modal
+      title={`Delete ${label}`}
+      close={() => {
+        if (!busy) close();
+      }}
+    >
+      <p className="text-sm leading-6">
+        Permanently delete <strong>{platform.name}</strong>?
+      </p>
+      <p className="mt-3 text-xs leading-6 text-muted-foreground">
+        {platform.type === "LINK"
+          ? "This removes the resource from everyone's directory."
+          : "This removes all SSO clients, credentials, roles, permissions, user assignments, and invitation grants for this platform. Users will lose access through Permit Kit."}{" "}
+        Audit history is retained. This cannot be undone.
+      </p>
+      {error && <ErrorNotice message={error} />}
+      <div className="mt-6 flex justify-end gap-2">
+        <Button variant="outline" disabled={busy} onClick={close}>
+          Cancel
+        </Button>
+        <Button variant="destructive" disabled={busy} onClick={remove}>
+          {busy ? "Deleting…" : `Delete ${label}`}
+        </Button>
+      </div>
+    </Modal>
   );
 }
 function PlatformForm({
@@ -357,10 +423,12 @@ function PlatformDetails({
   platform,
   refresh,
   edit,
+  remove,
 }: {
   platform: Platform;
   refresh: () => void;
   edit: () => void;
+  remove: () => void;
 }) {
   const [tab, setTab] = useState("clients"),
     [modal, setModal] = useState<"client" | "permission" | "role" | null>(null),
@@ -373,6 +441,18 @@ function PlatformDetails({
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
   const settings = useData<{ issuer: string }>("/api/admin/settings");
+  const actions = (
+    <div className="flex flex-wrap gap-2">
+      <Button variant="outline" onClick={edit} disabled={busy}>
+        <Settings2 size={14} />
+        {platform.type === "LINK" ? "Resource settings" : "Platform settings"}
+      </Button>
+      <Button variant="destructive" onClick={remove} disabled={busy}>
+        <Trash2 size={14} />
+        {platform.type === "LINK" ? "Delete resource" : "Delete platform"}
+      </Button>
+    </div>
+  );
   async function clientAction(client: Client, action: "rotate" | "toggle") {
     if (
       !confirm(
@@ -400,10 +480,7 @@ function PlatformDetails({
     return (
       <>
         <PageTitle title={platform.name} description={platform.description}>
-          <Button variant="outline" onClick={edit}>
-            <Settings2 size={14} />
-            Resource settings
-          </Button>
+          {actions}
         </PageTitle>
         <Panel className="max-w-3xl p-6">
           <div className="mb-4 flex items-center gap-3">
@@ -431,10 +508,7 @@ function PlatformDetails({
   return (
     <>
       <PageTitle title={platform.name} description={platform.description}>
-        <Button variant="outline" onClick={edit}>
-          <Settings2 size={14} />
-          Platform settings
-        </Button>
+        {actions}
       </PageTitle>
       <div className="mb-6 flex flex-wrap items-center gap-3">
         <Badge tone={platform.enabled ? "green" : "neutral"}>

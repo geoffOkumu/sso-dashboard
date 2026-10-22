@@ -21,9 +21,10 @@ import { Input } from "./ui/input";
 export async function api<T = Record<string, unknown>>(
   path: string,
   body?: unknown,
+  method = body === undefined ? "GET" : "POST",
 ): Promise<T> {
   const response = await fetch(path, {
-    method: body === undefined ? "GET" : "POST",
+    method,
     cache: "no-store",
     headers: { "Content-Type": "application/json" },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
@@ -230,7 +231,10 @@ export function Modal({
   return (
     <dialog
       ref={ref}
-      onCancel={close}
+      onCancel={(event) => {
+        event.preventDefault();
+        close();
+      }}
       onClick={(e) => {
         if (e.target === ref.current) close();
       }}

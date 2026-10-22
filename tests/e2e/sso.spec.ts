@@ -24,6 +24,57 @@ async function adminContext(browser: Browser) {
   return context;
 }
 const mutationHeaders = { Origin: "http://localhost:3100" };
+test("admin can cancel and confirm deleting platforms and directory resources", async ({
+  browser,
+}) => {
+  const context = await adminContext(browser);
+  const page = await context.newPage();
+  for (const type of ["SSO", "LINK"] as const) {
+    const name = `Delete test ${type}`;
+    const response = await context.request.post("/api/admin/platforms", {
+      headers: mutationHeaders,
+      data: {
+        name,
+        slug: `delete-test-${type.toLowerCase()}`,
+        description: "Deletion test",
+        icon: "layers",
+        launchUrl: "https://example.test",
+        type,
+        enabled: true,
+        displayOrder: 0,
+      },
+    });
+    expect(response.status()).toBe(201);
+    const platform = await response.json();
+    await page.goto("/platforms");
+    await page.getByRole("button", { name: new RegExp(name) }).click();
+    const label = type === "LINK" ? "Delete resource" : "Delete platform";
+    await page.getByRole("button", { name: label, exact: true }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toContainText(name);
+    await expect(dialog).toContainText("This cannot be undone");
+    await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(dialog).not.toBeVisible();
+    expect(
+      (
+        await context.request.get(`/api/admin/platforms/${platform.id}`)
+      ).status(),
+    ).toBe(200);
+    await page.getByRole("button", { name: label, exact: true }).click();
+    await dialog.getByRole("button", { name: label, exact: true }).click();
+    await expect(
+      page.getByRole("heading", { name: "Platforms", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: new RegExp(name) }),
+    ).toHaveCount(0);
+    await page.reload();
+    await expect(
+      page.getByRole("button", { name: new RegExp(name) }),
+    ).toHaveCount(0);
+  }
+  await context.close();
+});
 test("invitation-only sign-in is responsive and has no public registration", async ({
   page,
 }) => {

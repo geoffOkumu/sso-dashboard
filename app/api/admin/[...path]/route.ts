@@ -213,6 +213,45 @@ export async function GET(request: Request, context: Context) {
     throw new HttpError(404, "Unknown resource");
   });
 }
+export async function DELETE(request: Request, context: Context) {
+  return handle(async () => {
+    sameOrigin(request);
+    const { user } = await requireAdmin(request.headers);
+    await rateLimit(`admin:${user.id}`, 60);
+    const { path } = await context.params;
+    if (path.length !== 2 || path[0] !== "platforms")
+      throw new HttpError(404, "Unknown operation");
+    const id = uuid.parse(path[1]);
+    return json(
+      await adminTransaction(user.id, async (tx) => {
+        const platform = await tx.platform.findUnique({
+          where: { id },
+          include: { clients: { select: { oauthClientId: true } } },
+        });
+        if (!platform) throw new HttpError(404, "Platform not found");
+        // Remove role references before the platform cascades to its roles.
+        await tx.invitationGrant.deleteMany({ where: { platformId: id } });
+        await tx.userPlatformAccess.deleteMany({ where: { platformId: id } });
+        // PlatformClient cascades do not delete the underlying OAuth clients.
+        // Deleting those clients also removes their tokens and consents.
+        await tx.oauthClient.deleteMany({
+          where: {
+            clientId: {
+              in: platform.clients.map((client) => client.oauthClientId),
+            },
+          },
+        });
+        await tx.platform.delete({ where: { id } });
+        await audit(tx, user.id, "platform.deleted", id, id, {
+          name: platform.name,
+          slug: platform.slug,
+          type: platform.type,
+        });
+        return { success: true };
+      }),
+    );
+  });
+}
 export async function POST(request: Request, context: Context) {
   return handle(async () => {
     sameOrigin(request);
