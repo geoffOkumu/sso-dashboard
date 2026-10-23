@@ -216,9 +216,9 @@ const config = await oidc.discovery(
               </li>
               <li>
                 Build an authorization URL with <code>response_type=code</code>,
-                scopes <code>openid profile email</code>, the registered
-                redirect URI, state, nonce and an S256 PKCE challenge. Redirect
-                the browser there.
+                scopes <code>openid profile email offline_access</code>, the
+                registered redirect URI, state, nonce and an S256 PKCE
+                challenge. Redirect the browser there.
               </li>
               <li>
                 At the callback, atomically consume the flow record. Exchange
@@ -284,14 +284,15 @@ if (!decision.allowed ||
 }
 // Only now read protected application data.`}</Code>
             <p>
-              Here, <code>session</code> is your validated, unexpired server
-              session established after the callback. Never populate it from
-              browser-submitted identity or permission fields. A successful
-              response contains <code>allowed</code>, <code>reason</code>,{" "}
-              <code>subject</code>, <code>issuer</code>, <code>platformId</code>
-              , <code>role</code>, <code>permissions</code>,{" "}
-              <code>superadmin</code>, <code>securityVersion</code> and{" "}
-              <code>expiresAt</code> (Unix milliseconds).
+              Here, <code>session</code> is your validated server session after
+              any required renewal. Never populate it from browser-submitted
+              identity or permission fields. A successful response contains{" "}
+              <code>allowed</code>, <code>reason</code>, <code>subject</code>,{" "}
+              <code>issuer</code>, <code>platformId</code>, <code>role</code>,{" "}
+              <code>permissions</code>, <code>superadmin</code>,{" "}
+              <code>securityVersion</code> and <code>expiresAt</code>{" "}
+              (access-token deadline) and <code>sessionExpiresAt</code>{" "}
+              (central-session deadline), both in Unix milliseconds.
             </p>
             <ul className="mt-4 list-disc space-y-2 pl-5">
               <li>
@@ -327,10 +328,38 @@ if (!decision.allowed ||
           <section id="sessions">
             <h2>5. Handle expiry and sign-out</h2>
             <p>
-              Access tokens last 15 minutes. Refresh grants and offline scopes
-              are disabled. Cap your local session at token expiry and start a
-              fresh OIDC flow when it expires; an active central session can
-              sign the user in again.
+              Access tokens last 15 minutes. Request <code>offline_access</code>
+              and keep access and refresh tokens on the server. Before protected
+              requests, including form submissions, renew with
+              <code> refreshTokenGrant</code> when the token has 60 seconds or
+              less remaining, including after expiry. Successful renewal needs
+              no redirect or credential prompt.
+            </p>
+            <p className="mt-4">
+              Cap your app session and cookie at the central
+              <code> sessionExpiresAt</code>, and track access-token expiry
+              separately. Serialize refreshes per session (use a distributed
+              lock across workers), validate the original issuer, subject and
+              security version through an uncached access check, and atomically
+              save both rotated tokens only if the local session still exists.
+              Never reuse an old refresh token after rotation or an uncertain
+              response.
+            </p>
+            <p className="mt-4">
+              Renewal requires the original central session and current platform
+              access. It does not extend the central session’s 8-hour lifetime.
+              Central activity can extend that session after 30 minutes. Each
+              refresh token lasts up to 8 hours, subject to the central session.
+              Expiry, revocation or denied renewal requires sign-in again;
+              provider outages fail closed without executing the operation.
+            </p>
+            <p className="mt-4">
+              For upgrades, deploy the provider and run{" "}
+              <code>pnpm db:migrate</code> to enable renewal on existing
+              confidential clients. Update each connected app to request{" "}
+              <code>offline_access</code> and implement rotation. Existing app
+              sessions need one new authorization flow to obtain a refresh
+              token; a valid central session can satisfy it.
             </p>
             <p className="mt-4">
               For local sign-out, use a CSRF-protected POST that deletes your

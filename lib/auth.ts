@@ -1,7 +1,12 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { jwt, twoFactor } from "better-auth/plugins";
-import { oauthProvider } from "@better-auth/oauth-provider";
+import {
+  oauthProvider,
+  getOAuthProviderApi,
+  type OAuthOptions,
+} from "@better-auth/oauth-provider";
+import { requireOAuthSession } from "./oauth-session";
 import {
   APIError,
   createAuthMiddleware,
@@ -13,6 +18,70 @@ import { sendMail } from "./mail";
 import { userFields } from "./auth-schema";
 import { currentAccess } from "./access";
 const env = getEnv();
+const oauthOptions = {
+  loginPage: "/sign-in",
+  consentPage: "/consent",
+  scopes: ["openid", "profile", "email", "offline_access"],
+  grantTypes: ["authorization_code", "refresh_token"],
+  validateRedirectUri: (uri, registered, defaultResult) =>
+    defaultResult && registered.includes(uri),
+  accessTokenExpiresIn: 900,
+  refreshTokenExpiresIn: 60 * 60 * 8,
+  refreshTokenReuseInterval: 0,
+  allowDynamicClientRegistration: false,
+  storeClientSecret: "hashed",
+  clientReference: () => "company",
+  clientPrivileges: async ({ user }) => {
+    if (!user) return false;
+    const current = await db.user.findUnique({ where: { id: user.id } });
+    return (
+      current?.status === "ACTIVE" &&
+      current.globalRole === "SUPERADMIN" &&
+      !!current.twoFactorEnabled
+    );
+  },
+  extensions: [
+    {
+      claims: {
+        // ID-token claims run before opaque tokens are minted too.
+        idToken: async ({ user, client, sessionId }) => {
+          if (!user)
+            throw new APIError("FORBIDDEN", { message: "User required" });
+          await requireOAuthSession(user.id, client.clientId, sessionId);
+          return {};
+        },
+        accessToken: async ({ user, client, sessionId, grantType }) => {
+          if (!user)
+            throw new APIError("FORBIDDEN", { message: "User required" });
+          // Opaque introspection omits sessionId in this provider version.
+          // The access endpoint checks the authoritative sid from introspection.
+          const registration = await db.platformClient.findUnique({
+            where: { oauthClientId: client.clientId },
+          });
+          if (!registration)
+            throw new APIError("FORBIDDEN", {
+              message: "Unregistered platform",
+            });
+          const access = grantType
+            ? (await requireOAuthSession(user.id, client.clientId, sessionId))
+                .access
+            : await currentAccess(user.id, registration.platformId, {
+                clientEnabled: registration.enabled && !client.disabled,
+              });
+          if (!access.allowed)
+            throw new APIError("FORBIDDEN", {
+              message: "Platform access denied",
+            });
+          return {
+            security_version: access.securityVersion,
+            platform_id: registration.platformId,
+            central_session_id: sessionId,
+          };
+        },
+      },
+    },
+  ],
+} satisfies OAuthOptions;
 export const auth = betterAuth({
   appName: env.PRODUCT_NAME,
   baseURL: env.BETTER_AUTH_URL,
@@ -150,6 +219,43 @@ export const auth = betterAuth({
   },
   hooks: {
     before: createAuthMiddleware(async (ctx) => {
+      if (
+        ctx.path === "/oauth2/token" &&
+        ctx.body?.grant_type === "refresh_token"
+      ) {
+        // Enforce policy before rotation, even for opaque tokens and downscoped
+        // refreshes without openid (which do not invoke the claim extensions).
+        const provider = getOAuthProviderApi(
+          ctx,
+          oauthOptions,
+          "refresh_token",
+        );
+        const client = await provider.authenticateClient();
+        const value = ctx.body.refresh_token;
+        const token =
+          typeof value === "string" && value.length <= 16000
+            ? await db.oauthRefreshToken.findUnique({
+                where: {
+                  token: await provider.hashToken(value, "refresh_token"),
+                },
+              })
+            : null;
+        if (
+          !token ||
+          token.clientId !== client.clientId ||
+          token.expiresAt <= new Date()
+        )
+          throw new APIError("BAD_REQUEST", {
+            error: "invalid_grant",
+            error_description: "Session or access expired",
+          });
+        await requireOAuthSession(
+          token.userId,
+          client.clientId,
+          token.sessionId,
+        );
+        // The provider still validates scopes and handles rotation/replay.
+      }
       if (ctx.path === "/two-factor/disable") {
         const session = await getSessionFromCtx(ctx);
         if (session?.user.globalRole === "SUPERADMIN")
@@ -189,65 +295,6 @@ export const auth = betterAuth({
       jwt: { issuer: `${env.BETTER_AUTH_URL}/api/auth` },
     }),
     twoFactor({ issuer: env.PRODUCT_NAME }),
-    oauthProvider({
-      loginPage: "/sign-in",
-      consentPage: "/consent",
-      scopes: ["openid", "profile", "email"],
-      grantTypes: ["authorization_code"],
-      validateRedirectUri: (uri, registered, defaultResult) =>
-        defaultResult && registered.includes(uri),
-      accessTokenExpiresIn: 900,
-      allowDynamicClientRegistration: false,
-      storeClientSecret: "hashed",
-      clientReference: () => "company",
-      clientPrivileges: async ({ user }) => {
-        if (!user) return false;
-        const current = await db.user.findUnique({ where: { id: user.id } });
-        return (
-          current?.status === "ACTIVE" &&
-          current.globalRole === "SUPERADMIN" &&
-          !!current.twoFactorEnabled
-        );
-      },
-      extensions: [
-        {
-          claims: {
-            accessToken: async ({ user, client, sessionId, grantType }) => {
-              if (!user)
-                throw new APIError("FORBIDDEN", { message: "User required" });
-              const registration = await db.platformClient.findUnique({
-                where: { oauthClientId: client.clientId },
-              });
-              const session = sessionId
-                ? await db.session.findUnique({ where: { id: sessionId } })
-                : null;
-              if (grantType && (!session || session.expiresAt <= new Date()))
-                throw new APIError("FORBIDDEN", { message: "Session expired" });
-              if (!registration)
-                throw new APIError("FORBIDDEN", {
-                  message: "Unregistered platform",
-                });
-              const access = await currentAccess(
-                user.id,
-                registration.platformId,
-                {
-                  clientEnabled: registration.enabled,
-                  sessionVersion: session?.securityVersion,
-                },
-              );
-              if (!access.allowed)
-                throw new APIError("FORBIDDEN", {
-                  message: "Platform access denied",
-                });
-              return {
-                security_version: access.securityVersion,
-                platform_id: registration.platformId,
-                central_session_id: sessionId,
-              };
-            },
-          },
-        },
-      ],
-    }),
+    oauthProvider(oauthOptions),
   ],
 });

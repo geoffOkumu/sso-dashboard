@@ -10,6 +10,7 @@ export type AccessDecision = {
   superadmin: boolean;
   securityVersion: number;
   expiresAt: number;
+  sessionExpiresAt: number;
 };
 export class AccessDenied extends Error {
   constructor(public reason: string) {

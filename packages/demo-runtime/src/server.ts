@@ -11,6 +11,11 @@ import {
   createAccessClient,
   AccessDenied,
 } from "../../access-client/src/index";
+import {
+  createSessionRenewer,
+  sessionExpiry,
+  type ToolSession,
+} from "./session";
 export function startDemo(kind: "crm" | "analytics") {
   const env = process.env;
   for (const key of [
@@ -45,6 +50,19 @@ export function startDemo(kind: "crm" | "analytics") {
     CREATE TABLE IF NOT EXISTS session (id TEXT PRIMARY KEY, issuer TEXT NOT NULL, subject TEXT NOT NULL, name TEXT NOT NULL, accessToken TEXT NOT NULL, securityVersion INTEGER NOT NULL, expires INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS identity (issuer TEXT NOT NULL, subject TEXT NOT NULL, name TEXT NOT NULL, PRIMARY KEY (issuer, subject));
     CREATE TABLE IF NOT EXISTS record (id INTEGER PRIMARY KEY, name TEXT NOT NULL, detail TEXT NOT NULL);`);
+  // Preserve existing demo records and sessions when upgrading their store.
+  const columns = db.prepare("PRAGMA table_info(session)").all() as {
+    name: string;
+  }[];
+  if (!columns.some((column) => column.name === "refreshToken"))
+    db.exec("ALTER TABLE session ADD COLUMN refreshToken TEXT");
+  if (!columns.some((column) => column.name === "accessTokenExpires")) {
+    db.exec(
+      "ALTER TABLE session ADD COLUMN accessTokenExpires INTEGER NOT NULL DEFAULT 0",
+    );
+    db.exec("UPDATE session SET accessTokenExpires = expires");
+  }
+
   if (
     !(db.prepare("SELECT count(*) AS n FROM record").get() as { n: number }).n
   ) {
@@ -120,7 +138,8 @@ export function startDemo(kind: "crm" | "analytics") {
       "Content-Type": `${type}; charset=utf-8`,
       "Cache-Control": "no-store",
       "X-Content-Type-Options": "nosniff",
-      "Referrer-Policy": "no-referrer",
+      // Preserve Origin on same-origin native form POSTs for the CSRF check.
+      "Referrer-Policy": "same-origin",
       "Content-Security-Policy":
         "default-src 'self'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'",
     });
@@ -133,29 +152,79 @@ export function startDemo(kind: "crm" | "analytics") {
     });
     response.end();
   }
-  type Session = {
-    id: string;
-    issuer: string;
-    subject: string;
-    name: string;
-    accessToken: string;
-    securityVersion: number;
-    expires: number;
-  };
+  const renewSession = createSessionRenewer({
+    issuer,
+    load: (id) =>
+      db.prepare("SELECT * FROM session WHERE id = ?").get(id) as
+        | ToolSession
+        | undefined,
+    save: (previous, next) =>
+      Number(
+        db
+          .prepare(
+            "UPDATE session SET accessToken = ?, refreshToken = ?, accessTokenExpires = ?, expires = ? WHERE id = ? AND refreshToken = ?",
+          )
+          .run(
+            next.accessToken,
+            next.refreshToken,
+            next.accessTokenExpires,
+            next.expires,
+            previous.id,
+            previous.refreshToken,
+          ).changes,
+      ) === 1,
+    remove: (id) => {
+      db.prepare("DELETE FROM session WHERE id = ?").run(id);
+    },
+    refresh: async (session) => {
+      let token;
+      try {
+        token = await oidc.refreshTokenGrant(
+          await config(),
+          session.refreshToken!,
+        );
+      } catch (error) {
+        if (
+          error instanceof oidc.ResponseBodyError &&
+          error.status < 500 &&
+          error.status !== 429
+        )
+          throw new AccessDenied("session_expired");
+        throw error;
+      }
+      const claims = token.claims();
+      if (claims && (claims.iss !== issuer || claims.sub !== session.subject))
+        throw new AccessDenied("invalid_identity");
+      return {
+        accessToken: token.access_token,
+        refreshToken: token.refresh_token!,
+        expiresIn: token.expires_in!,
+      };
+    },
+    validate: (session) =>
+      access.check({ ...session, sessionId: session.id }, undefined, true),
+  });
   async function protectedSession(
     request: IncomingMessage,
+    response: ServerResponse,
     permission?: string,
     sensitive = false,
   ) {
-    const session = db
-      .prepare("SELECT * FROM session WHERE id = ?")
-      .get(cookies(request)[`${prefix}-session`] || "") as Session | undefined;
-    if (!session || session.expires <= Date.now() || session.issuer !== issuer)
-      throw new AccessDenied("session_expired");
+    const session = await renewSession(
+      cookies(request)[`${prefix}-session`] || "",
+    );
     const decision = await access.check(
       { ...session, sessionId: session.id },
       permission,
       sensitive,
+    );
+    response.setHeader(
+      "Set-Cookie",
+      cookie(
+        "session",
+        session.id,
+        Math.max(1, Math.floor((session.expires - Date.now()) / 1000)),
+      ),
     );
     return { session, decision };
   }
@@ -189,7 +258,7 @@ export function startDemo(kind: "crm" | "analytics") {
         );
         const target = oidc.buildAuthorizationUrl(configuration, {
           redirect_uri: `${appUrl.origin}/callback`,
-          scope: "openid profile email",
+          scope: "openid profile email offline_access",
           code_challenge: await oidc.calculatePKCECodeChallenge(verifier),
           code_challenge_method: "S256",
           state,
@@ -242,24 +311,31 @@ export function startDemo(kind: "crm" | "analytics") {
           issuer: string;
           securityVersion: number;
           expiresAt: number;
+          sessionExpiresAt: number;
         };
         if (
           !decision.allowed ||
           decision.subject !== claims.sub ||
           decision.issuer !== issuer ||
-          !Number.isInteger(decision.securityVersion)
+          !Number.isInteger(decision.securityVersion) ||
+          !token.refresh_token ||
+          !Number.isFinite(token.expires_in) ||
+          token.expires_in! <= 0
         )
           throw new AccessDenied("invalid_identity");
         const sessionId = randomBytes(32).toString("base64url"),
           name = typeof claims.name === "string" ? claims.name : "Team member";
-        const expires = Math.min(
+        const expires = sessionExpiry(decision);
+        const accessTokenExpires = Math.min(
           decision.expiresAt,
-          Date.now() + Number(token.expires_in || 900) * 1000,
+          Date.now() + token.expires_in! * 1000,
         );
         db.prepare(
           "INSERT INTO identity VALUES (?,?,?) ON CONFLICT(issuer,subject) DO UPDATE SET name=excluded.name",
         ).run(issuer, claims.sub, name);
-        db.prepare("INSERT INTO session VALUES (?,?,?,?,?,?,?)").run(
+        db.prepare(
+          "INSERT INTO session (id, issuer, subject, name, accessToken, securityVersion, expires, refreshToken, accessTokenExpires) VALUES (?,?,?,?,?,?,?,?,?)",
+        ).run(
           sessionId,
           issuer,
           claims.sub,
@@ -267,6 +343,8 @@ export function startDemo(kind: "crm" | "analytics") {
           token.access_token,
           decision.securityVersion,
           expires,
+          token.refresh_token,
+          accessTokenExpires,
         );
         response.setHeader("Set-Cookie", [
           cookie("flow", "", 0),
@@ -309,7 +387,7 @@ export function startDemo(kind: "crm" | "analytics") {
             '{"error":"POST required"}',
             "application/json",
           );
-        await protectedSession(request, permission, true);
+        await protectedSession(request, response, permission, true);
         let raw = "";
         for await (const chunk of request) {
           raw += chunk;
@@ -362,6 +440,7 @@ export function startDemo(kind: "crm" | "analytics") {
         return redirect(response, "/login");
       const { session, decision } = await protectedSession(
         request,
+        response,
         readPermission,
       );
       const can = (permission: string) =>

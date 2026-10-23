@@ -80,6 +80,7 @@ export async function POST(request: Request) {
       subject: tokenInfo.sub,
       issuer: `${getEnv().BETTER_AUTH_URL}/api/auth`,
       platformId: registration.platformId,
+      sessionExpiresAt: session.expiresAt.getTime(),
       expiresAt: Math.min(
         Number(tokenInfo.exp) * 1000,
         session.expiresAt.getTime(),
