@@ -93,7 +93,7 @@ When upgrading an existing installation, run `pnpm db:migrate` and `pnpm db:gene
 - Confidential client credentials and tokens remain on servers. Each demo has its own random HttpOnly session cookie and SQLite store, keyed by validated issuer and subject.
 - Every protected tool operation checks central policy. Positive cache is 30 seconds by default, capped at **60 seconds**. Sensitive writes always bypass it. Outages fail closed after cache expiry.
 - Global logout increments a persistent generation and deletes central sessions/tokens. Old tool sessions stay invalid after another central login. Local logout ends only the relevant app session.
-- Access tokens last 15 minutes. Refresh grants are disabled; expiration triggers a new OIDC flow, reusing a valid central session.
+- Access tokens last 15 minutes. Connected apps request `offline_access` and automatically rotate refresh tokens on the server before protected requests when a token is within 60 seconds of expiry (or has expired). Renewal requires the original central SSO session and current access; it does not extend that session. See [integration and upgrade instructions](docs/INTEGRATION.md#automatic-session-renewal).
 - PostgreSQL backs rate limits across app instances. The trusted proxy IP header must be configured explicitly in production.
 
 ## Validation

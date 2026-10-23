@@ -29,7 +29,7 @@ Platforms have a fixed `SSO` or `LINK` type. The migration defaults existing pla
 7. Required permissions must belong to the assigned platform role.
 8. Deny everything else.
 
-Both authorization requests with existing sessions and token issuance enforce policy. The token-claim extension rechecks at issuance even when login/consent resumes internally. No refresh grant or offline scope is offered; tokens expire after 15 minutes. Reauthorization uses the existing central session and current policy. OIDC access tokens are never a permanent source of authorization.
+Both authorization requests with existing sessions and token issuance enforce policy. ID-token and JWT access-token claim extensions recheck policy at issuance even when login/consent resumes internally; opaque-token introspection also checks policy. A token-endpoint hook authenticates the client and checks the refresh token’s original session, user, generation and current platform access before any refresh rotation, including opaque tokens and downscoped grants without `openid`. Access tokens expire after 15 minutes. The `offline_access` scope enables rotating refresh tokens, but renewal always requires that original central session to remain valid. OIDC access tokens are never a permanent source of authorization.
 
 Composite foreign keys enforce role/platform and permission/platform integrity. Administrative data changes and audit entries share a transaction except provider-managed client creation/rotation, which have their own provider transaction. A failed client-to-platform link disables the orphan provider client. Rotation must be retried if its audit write fails; an already-rotated secret cannot be recovered. Administrative mutations use a PostgreSQL advisory transaction lock, including checks that prevent concurrent demotion/suspension of the last active superadmin. Direct database writes are an operator trust boundary and must not be used for routine administration.
 
@@ -56,7 +56,8 @@ Successful response:
   "permissions": ["contacts.read"],
   "superadmin": false,
   "securityVersion": 1,
-  "expiresAt": 1790000000000
+  "expiresAt": 1790000000000,
+  "sessionExpiresAt": 1790027900000
 }
 ```
 
@@ -64,7 +65,7 @@ Responses are `no-store, private`. Authentication failure is 401; policy denial 
 
 ## Session and revocation behavior
 
-Central sessions live for 8 hours; demo sessions live no longer than their 15-minute access token. Demo session cookies contain only random references; access tokens remain in each tool's server database. Cookies have HttpOnly, SameSite=Lax, no Domain, and Secure + \_\_Host names in production. Demo cookie names are distinct for local development, where cookie scopes ignore ports. OIDC flow state, nonce and verifier remain in the tool database with a five-minute, single-consumption browser-bound flow cookie.
+Central sessions have an 8-hour lifetime and may be extended by central activity after 30 minutes. Refreshing an app token does not extend the central session. App sessions and cookies are capped at the last observed central `sessionExpiresAt`, independently of the 15-minute access-token expiry. The demos renew on demand before protected reads or writes when the access token has 60 seconds or less remaining, including after expiry. No background timer or browser redirect is needed for successful renewal. Demo session cookies contain only random references; access and refresh tokens remain in each tool's server database. Cookies have HttpOnly, SameSite=Lax, no Domain, and Secure + \_\_Host names in production. Demo cookie names are distinct for local development, where cookie scopes ignore ports. OIDC flow state, nonce and verifier remain in the tool database with a five-minute, single-consumption browser-bound flow cookie.
 
 The access helper keys successful entries by issuer, registered client, subject, app session ID, security version and token hash. It caches for 30 seconds by default; configured values are capped at 60 seconds and token expiry. Cache lifetime starts before the request, not after it. Sensitive writes bypass cached decisions. Unavailable authorization denies access once a valid cache entry expires; it never extends cache on failure. Cached reads may remain valid for the documented window.
 
@@ -78,4 +79,4 @@ Sensitive self-service and administrative mutations require the exact configured
 
 Local HTTP registrations use the provider's `native` application-type URL rules, with confidential Basic authentication and PKCE still required. This is necessary because 1.7.10 rejects loopback URLs for `web` registrations. An extra redirect validator disables the native variable-port exception and requires exact registered URIs. Production clients use HTTPS `web` registrations. This is a supported development configuration, not a simulated SSO flow.
 
-Signing keys are persisted by the JWT plugin in `jwks`. Preserve the database and `BETTER_AUTH_SECRET`; losing either can invalidate sessions or encrypted MFA/key material. See deployment guidance for supported rotation. Refresh rotation is intentionally out of scope because refresh grants are disabled. Demo SQLite deployments are single-instance examples; use a tool-owned shared database/session store for horizontal scaling.
+Signing keys are persisted by the JWT plugin in `jwks`. Preserve the database and `BETTER_AUTH_SECRET`; losing either can invalidate sessions or encrypted MFA/key material. See deployment guidance for supported rotation. Refresh tokens have an 8-hour lifetime per issuance, are hashed centrally, and rotate on every use with no reuse grace period. Replaying a rotated token triggers the provider’s family invalidation. The demos serialize renewal per session, validate the replacement token through an uncached access check, and atomically replace both tokens only if the old session still exists. Failed or ambiguous renewal removes the local session rather than retrying a possibly consumed token. A local logout during renewal cannot recreate the session. Multi-instance apps must use a distributed session lock and atomic token replacement. Demo SQLite deployments are single-instance examples; use a tool-owned shared database/session store for horizontal scaling.

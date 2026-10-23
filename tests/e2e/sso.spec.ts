@@ -1,5 +1,6 @@
 import { test, expect, type Page, type Browser } from "@playwright/test";
 import { readFileSync } from "node:fs";
+import { DatabaseSync } from "node:sqlite";
 import { createOTP } from "@better-auth/utils/otp";
 import { base32 } from "@better-auth/utils/base32";
 const fixture = JSON.parse(readFileSync(".generated/e2e-fixture.json", "utf8"));
@@ -651,4 +652,115 @@ test("admin adds a directory resource that unassigned employees can discover", a
     page.getByRole("heading", { name: "Team handbook", exact: true }),
   ).not.toBeVisible();
   await admin.close();
+});
+
+test("apps renew expired access tokens during reads and form submissions without redirecting to SSO", async ({
+  page,
+}) => {
+  const testEnv = JSON.parse(readFileSync(".generated/test-env.json", "utf8"));
+  if (!testEnv.TEST_SCHEMA?.startsWith("test_access_"))
+    throw new Error("Isolated test schema required");
+  await page.goto("http://localhost:3101/");
+  await login(page, "renewal");
+  await expect(page).toHaveURL("http://localhost:3101/");
+  await page.goto("http://localhost:3102/");
+  await expect(page).toHaveURL("http://localhost:3102/");
+  const cookies = await page.context().cookies();
+  for (const kind of ["crm", "analytics"] as const) {
+    const cookie = cookies.find(
+      (cookie) => cookie.name === `company-${kind}-session`,
+    )!;
+    expect(cookie.expires * 1000 - Date.now()).toBeGreaterThan(900_000);
+    const store = new DatabaseSync(
+      `.generated/${testEnv.TEST_SCHEMA}-${kind}/${kind}.sqlite`,
+    );
+    try {
+      const before = store
+        .prepare("SELECT accessToken, refreshToken FROM session WHERE id = ?")
+        .get(cookie.value)!;
+      expect(typeof before.refreshToken).toBe("string");
+      store
+        .prepare("UPDATE session SET accessTokenExpires = ? WHERE id = ?")
+        .run(Date.now() - 1000, cookie.value);
+      if (kind === "crm") {
+        const crossSite = await page.request.post(
+          "http://localhost:3101/api/create",
+          {
+            headers: { Origin: "https://untrusted.example" },
+            form: { name: "Cross-site denied", detail: "Must not be created" },
+          },
+        );
+        expect(crossSite.status()).toBe(403);
+        expect(await crossSite.text()).toContain("Invalid request origin");
+        // Leave the already-rendered form intact while its access token expires.
+        await page.goto("http://localhost:3101/");
+        store
+          .prepare("UPDATE session SET accessTokenExpires = ? WHERE id = ?")
+          .run(Date.now() - 1000, cookie.value);
+        await page
+          .getByRole("textbox", { name: "Name", exact: true })
+          .fill("Renewed form contact");
+        await page
+          .getByRole("textbox", { name: "Detail", exact: true })
+          .fill("Saved without signing in again");
+        const submission = page.waitForResponse(
+          (response) => response.url() === "http://localhost:3101/api/create",
+        );
+        await page
+          .getByRole("button", { name: "Add record", exact: true })
+          .click();
+        const submitted = await submission;
+        expect(
+          submitted.status(),
+          submitted.status() === 302 ? "" : await submitted.text(),
+        ).toBe(302);
+        await expect(page).toHaveURL("http://localhost:3101/");
+        await expect(
+          page.getByRole("cell", { name: "Renewed form contact", exact: true }),
+        ).toBeVisible();
+        // Parallel requests must share a single refresh, without replaying writes.
+        store
+          .prepare("UPDATE session SET accessTokenExpires = ? WHERE id = ?")
+          .run(Date.now() - 1000, cookie.value);
+        const responses = await Promise.all(
+          [1, 2].map((n) =>
+            page.request.post("http://localhost:3101/api/create", {
+              headers: { Origin: "http://localhost:3101" },
+              form: { name: `Concurrent renewal ${n}`, detail: "One write" },
+              maxRedirects: 0,
+            }),
+          ),
+        );
+        expect(responses.map((response) => response.status())).toEqual([
+          302, 302,
+        ]);
+        expect(
+          store
+            .prepare(
+              "SELECT count(*) AS n FROM record WHERE name LIKE 'Concurrent renewal %'",
+            )
+            .get()!.n,
+        ).toBe(2);
+      } else {
+        await page.goto("http://localhost:3102/");
+        await expect(page).toHaveURL("http://localhost:3102/");
+        await expect(
+          page.getByRole("heading", { name: "Your reports" }),
+        ).toBeVisible();
+      }
+      const after = store
+        .prepare(
+          "SELECT accessToken, refreshToken, accessTokenExpires, expires FROM session WHERE id = ?",
+        )
+        .get(cookie.value)!;
+      expect(after.accessToken !== before.accessToken).toBe(true);
+      expect(after.refreshToken !== before.refreshToken).toBe(true);
+      expect(Number(after.accessTokenExpires)).toBeGreaterThan(Date.now());
+      expect(Number(after.expires)).toBeGreaterThan(
+        Number(after.accessTokenExpires),
+      );
+    } finally {
+      store.close();
+    }
+  }
 });

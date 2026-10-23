@@ -13,6 +13,7 @@ for (const [key, globalRole, mfa] of [
   ["enrollment", "SUPERADMIN", false],
   ["viewer", "EMPLOYEE", false],
   ["editor", "EMPLOYEE", false],
+  ["renewal", "EMPLOYEE", false],
   ["unassigned", "EMPLOYEE", false],
 ] as const) {
   const user = await db.user.create({
@@ -96,12 +97,12 @@ for (const [kind, port] of [
       })),
     });
   }
-  for (const key of ["viewer", "editor"])
+  for (const key of ["viewer", "editor", "renewal"])
     await db.userPlatformAccess.create({
       data: {
         userId: users[key].id,
         platformId: platform.id,
-        roleId: roles[key],
+        roleId: roles[key === "renewal" ? "editor" : key],
       },
     });
   const client = await auth.api.adminCreateOAuthClient({
@@ -110,8 +111,8 @@ for (const [kind, port] of [
       client_name: `${kind} test`,
       redirect_uris: [`http://localhost:${port}/callback`],
       post_logout_redirect_uris: [`http://localhost:${port}/`],
-      scope: "openid profile email",
-      grant_types: ["authorization_code"],
+      scope: "openid profile email offline_access",
+      grant_types: ["authorization_code", "refresh_token"],
       response_types: ["code"],
       token_endpoint_auth_method: "client_secret_basic",
       require_pkce: true,

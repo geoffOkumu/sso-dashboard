@@ -50,7 +50,7 @@ The final runs have no failing tests. An intermediate database run exposed mail 
 
 The development-only ESLint dependency chain contains one high-severity `braces` advisory (GHSA-vfj7-8cjw-p6xm). The advisory names 3.0.4 as the fix, but the configured registry's version listing ends at 3.0.3. Production dependencies audited clean on the date of this report. Upgrade the lint chain when the fix is available; avoid untrusted pathological glob inputs in lint configuration.
 
-Demo tools intentionally use separate local SQLite databases and run as single instances; their storage is an integration example, not a multi-instance production database. Positive authorization caching is 30 seconds by default and capped at 60; sensitive operations bypass it. No refresh tokens are issued. Tool sessions expire with 15-minute access tokens and then reauthorize. Production HTTPS deployment and real email deliverability require operator infrastructure and were not exercised locally. This validation is not an independent security audit.
+Demo tools intentionally use separate local SQLite databases and run as single instances; their storage is an integration example, not a multi-instance production database. Positive authorization caching is 30 seconds by default and capped at 60; sensitive operations bypass it. Access tokens last 15 minutes. The current implementation uses rotating refresh tokens for automatic server-side renewal while the original central session remains valid. Multi-instance integrations must add distributed refresh locking; the demo lock is process-local. See the automatic-renewal validation section below for coverage added after the original validation runs. Production HTTPS deployment and real email deliverability require operator infrastructure and were not exercised locally. This validation is not an independent security audit.
 
 ## Publication preparation — 19 October 2026
 
@@ -66,3 +66,16 @@ Checked the open-source preparation changes with Node.js 24.18.0 and pnpm 11.9.0
 - A fresh production dependency audit reported zero advisories. The full audit still reported the development-only `braces` advisory [GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm). The advisory requires 3.0.4 or later; the configured registry reported 3.0.3 as its latest version. No dependency override was added for an unavailable release.
 
 The GitHub Actions workflow has been added and its YAML checked locally; it has not yet run on GitHub. Docker Compose setup and a fresh dependency download were not exercised in this pass. GitHub visibility, security settings, and branch protection were not changed. The maintainer selected MIT; the full license and matching metadata are included. Confirming asset distribution rights remains on the [release checklist](RELEASING.md).
+
+## Automatic session renewal — 23 October 2026
+
+Validated the rotating-refresh implementation with the installed Node.js 24.18.0 toolchain:
+
+- ESLint, TypeScript, formatting and `git diff --check` passed.
+- All 107 unit tests passed, including single-flight rotation, renewal after token expiry, identity/generation validation, ambiguous refresh failure and local logout racing with renewal.
+- All 39 database/API/SMTP tests passed. Provider-backed refresh tests cover rotation and replay rejection, original-session binding, central and refresh expiry, generation mismatch, suspension, disabled clients/platforms, assignment removal/expiry, missing administrator MFA, incorrect credentials and global logout followed by a new central login. Denial tests also downscope away from `openid` to verify that policy enforcement does not depend on ID-token issuance.
+- The client migration was exercised against existing registration data, including a second application to verify that it preserves credentials and redirect URLs without duplicating scopes or grants.
+- All 13 Chromium tests passed. The renewal test advances app-store token deadlines to simulate expiry, then verifies uninterrupted reads in both demos, a native form submission with its data preserved, and concurrent writes sharing one rotation. Cross-site form origins remain rejected. The demos use `Referrer-Policy: same-origin` so native same-origin forms retain the Origin header required by the CSRF check.
+- The production Webpack build passed with an HTTPS example origin, including route/page generation.
+
+Database, browser and build checks ran in a temporary source copy using a dedicated disposable local PostgreSQL database. The source copy, database, test schemas and temporary credentials were removed afterward. The existing application database and running development server were not used for these tests. Deployment migrations have not been applied to an existing installation; follow the [upgrade steps](INTEGRATION.md#upgrade-existing-installations) when rolling this out. External connected apps must implement the documented renewal contract; updating the provider alone does not update their code. Production infrastructure and multi-instance refresh locking were not exercised.

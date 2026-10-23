@@ -42,7 +42,7 @@ Administrative database mutations and their audit entry commit together. Provide
 
 ## Limits and deliberate choices
 
-- No refresh tokens: tool sessions expire after 15 minutes, then reauthorize through the central session. This avoids revocation being bypassed by refresh.
+- Session-bound refresh tokens: access tokens last 15 minutes; apps renew on the server while the original central session and current policy remain valid. Refresh tokens rotate on every use, have an 8-hour lifetime per issuance, and cannot bypass session expiry or revocation. Apply the client-scope migration and update each app as described in [the integration guide](INTEGRATION.md#automatic-session-renewal).
 - Positive access checks can be cached up to 60 seconds; sensitive operations bypass cache. Central outages fail closed after cache expiry.
 - Single-company scope only. No registration, tenant switching or billing.
 - Demo application records and sessions use local SQLite, not a production multi-instance storage architecture.

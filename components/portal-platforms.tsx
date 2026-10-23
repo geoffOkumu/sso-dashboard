@@ -912,7 +912,8 @@ function ClientForm({
       <div className="rounded-md bg-muted p-3 text-[11px] leading-6 text-muted-foreground">
         Confidential client · Authorization Code + PKCE S256
         <br />
-        Scopes: openid, profile, email · No refresh tokens
+        Scopes: openid, profile, email, offline_access · Automatic session
+        renewal
       </div>
       <Button disabled={busy} className="w-full">
         {busy
@@ -1027,7 +1028,7 @@ function IntegrationGuide({
 }) {
   const example = `OIDC_ISSUER=${issuer}\nOIDC_CLIENT_ID=${platform.clients[0]?.oauthClientId || "<client-id>"}\nOIDC_CLIENT_SECRET=<server-side-secret>\nAPP_URL=${new URL(platform.launchUrl).origin}`;
   const checklist =
-    "1. Register exact callback and post-logout URLs.\n2. Store client credentials on the server.\n3. Use Authorization Code Flow with PKCE S256, state and nonce.\n4. Validate issuer, signature, audience and expiry.\n5. Store tokens on the server in your own app session.\n6. Check /api/access/check for every protected server operation.\n7. Bypass the cache for sensitive actions.\n8. Test revocation, permissions, outages and global logout.";
+    "1. Register exact callback and post-logout URLs.\n2. Store client credentials on the server.\n3. Use Authorization Code Flow with PKCE S256, state, nonce and offline_access.\n4. Validate issuer, signature, audience and expiry.\n5. Store access and refresh tokens on the server; cap your app session at central sessionExpiresAt.\n6. Check /api/access/check for every protected server operation.\n7. Bypass the cache for sensitive actions.\n8. Serialize refreshTokenGrant before requests when the access token has 60 seconds left; validate and atomically save rotated tokens.\n9. Test renewal, revocation, permissions, outages and global logout.";
   return (
     <div className="grid gap-6 xl:grid-cols-2">
       <Panel className="p-6">

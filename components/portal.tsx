@@ -589,7 +589,7 @@ function WorkspaceSettings() {
             ["Invitation lifetime", `${data.invitationHours} hours`],
             ["Administrator MFA", "Required"],
             ["Public registration", "Disabled"],
-            ["Refresh token grant", "Disabled"],
+            ["Refresh token grant", "Rotating · central session required"],
           ].map(([key, value]) => (
             <div
               key={key}
