@@ -17,7 +17,7 @@ export default async function Page() {
   if (!result.user.passwordChangeRequired) redirect("/");
   return (
     <AuthShell name={productName}>
-      <AuthForm mode="initial-password" name={productName} />
+      <AuthForm mode="initial-password" />
     </AuthShell>
   );
 }

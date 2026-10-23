@@ -1,14 +1,13 @@
 "use client";
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
-import { ArrowRight, ShieldCheck, Loader2, KeyRound } from "lucide-react";
+import { ShieldCheck, Loader2 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 export function AuthForm({
   mode,
   token,
-  name,
 }: {
   mode:
     | "sign-in"
@@ -18,7 +17,6 @@ export function AuthForm({
     | "consent"
     | "initial-password";
   token?: string;
-  name: string;
 }) {
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
@@ -128,7 +126,7 @@ export function AuthForm({
   const heading = mfa
     ? "Verify it's you"
     : {
-        "sign-in": "Welcome back",
+        "sign-in": "Sign in",
         forgot: "Forgot your password?",
         reset: "Choose a new password",
         "initial-password": "Change your temporary password",
@@ -136,23 +134,26 @@ export function AuthForm({
         consent: "Connect your account",
       }[mode];
   return (
-    <div className="w-full max-w-[360px]">
-      <div className="mb-7 inline-flex h-12 w-12 items-center justify-center rounded-xl border border-border bg-white shadow-sm">
-        <KeyRound size={22} className="text-primary" />
-      </div>
-      <h1 className="text-[28px] font-semibold tracking-[-.8px]">{heading}</h1>
-      <p className="mb-8 mt-2 text-[13px] leading-6 text-muted-foreground">
+    <div className="w-full">
+      <h1 className="text-center text-2xl font-semibold tracking-tight">
+        {heading}
+      </h1>
+      <p className="mb-7 mt-2 text-center text-[13px] leading-5 text-muted-foreground">
         {mfa
-          ? "Enter a code from your authenticator to continue."
+          ? recovery
+            ? "Enter one of your recovery codes."
+            : "Enter a code from your authenticator."
           : mode === "sign-in"
-            ? `Sign in to your ${name} workspace.`
+            ? "Continue with your account."
             : mode === "invitation"
-              ? "Set up your company account to get started. Already have an account? Sign in first and leave the password blank."
+              ? "Create your account to continue."
               : mode === "consent"
-                ? "Allow this company application to use your name and email for sign-in."
+                ? "Share your name and email with this app to sign in."
                 : mode === "initial-password"
-                  ? "Choose a new password before accessing your workspace or applications. Your temporary password will no longer work."
-                  : "We'll help you securely access your account."}
+                  ? "Replace your temporary password to continue."
+                  : mode === "forgot"
+                    ? "We'll email you a reset link."
+                    : "Use at least 12 characters."}
       </p>
       {success ? (
         <div
@@ -248,6 +249,18 @@ export function AuthForm({
                       : "At least 12 characters"
                   }
                 />
+                {mode === "invitation" && (
+                  <span className="mt-2 block font-normal leading-5 text-muted-foreground">
+                    Already have an account?{" "}
+                    <Link
+                      href="/sign-in"
+                      className="text-primary hover:underline"
+                    >
+                      Sign in
+                    </Link>{" "}
+                    first, then leave this blank.
+                  </span>
+                )}
               </label>
             )}
           {mode === "initial-password" && (
@@ -282,6 +295,8 @@ export function AuthForm({
                 type="submit"
                 name="accept"
                 value="yes"
+                disabled={busy}
+                className="h-11 flex-1 shadow-none"
                 onClick={(e) => {
                   const input = document.createElement("input");
                   input.type = "hidden";
@@ -292,14 +307,30 @@ export function AuthForm({
               >
                 Allow access
               </Button>
-              <Button variant="outline" type="submit">
+              <Button
+                variant="outline"
+                type="submit"
+                disabled={busy}
+                className="h-11 flex-1 shadow-none"
+              >
                 Deny
               </Button>
             </div>
           ) : (
-            <Button disabled={busy} className="h-10 w-full" type="submit">
+            <Button
+              disabled={busy}
+              className="h-11 w-full shadow-none"
+              type="submit"
+            >
               {busy ? (
-                <Loader2 size={16} className="animate-spin" />
+                <>
+                  <Loader2
+                    size={16}
+                    className="animate-spin"
+                    aria-hidden="true"
+                  />
+                  Please wait…
+                </>
               ) : (
                 <>
                   {mfa
@@ -311,7 +342,6 @@ export function AuthForm({
                         : mode === "reset" || mode === "initial-password"
                           ? "Update password"
                           : "Accept invitation"}
-                  <ArrowRight size={15} />
                 </>
               )}
             </Button>
@@ -319,7 +349,7 @@ export function AuthForm({
           {mfa && (
             <button
               type="button"
-              className="text-xs text-primary"
+              className="block w-full text-center text-xs text-primary hover:underline"
               onClick={() => setRecovery(!recovery)}
             >
               {recovery ? "Use authenticator code" : "Use a recovery code"}
@@ -327,15 +357,13 @@ export function AuthForm({
           )}
         </form>
       )}
-      <div className="mt-8 border-t border-border pt-6 text-center text-xs leading-6 text-muted-foreground">
-        {mode === "sign-in" ? (
-          <>New to the team? Ask your administrator for an account.</>
-        ) : (
-          <Link href="/sign-in" className="text-primary">
+      {mode !== "sign-in" && mode !== "consent" && !success && (
+        <div className="mt-6 text-center text-xs">
+          <Link href="/sign-in" className="text-primary hover:underline">
             Back to sign in
           </Link>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

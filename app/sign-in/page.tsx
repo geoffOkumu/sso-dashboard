@@ -9,7 +9,7 @@ export default async function Page({
   const { token } = await searchParams;
   return (
     <AuthShell name={productName}>
-      <AuthForm mode="sign-in" token={token} name={productName} />
+      <AuthForm mode="sign-in" token={token} />
     </AuthShell>
   );
 }

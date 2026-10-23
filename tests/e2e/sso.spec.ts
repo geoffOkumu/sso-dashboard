@@ -81,11 +81,11 @@ test("invitation-only sign-in is responsive and has no public registration", asy
 }) => {
   await page.goto("/sign-in");
   await expect(
-    page.getByRole("heading", { name: "Welcome back" }),
+    page.getByRole("heading", { name: "Sign in", exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByText("Ask your administrator", { exact: false }),
-  ).toBeVisible();
+    page.getByRole("link", { name: /sign up|register/i }),
+  ).toHaveCount(0);
   await page.screenshot({
     path: ".generated/sign-in-desktop.png",
     fullPage: true,
@@ -147,7 +147,7 @@ test("real PKCE sign-in supports SSO into the second tool; viewer direct mutatio
 }) => {
   await page.goto("http://localhost:3101/");
   await expect(
-    page.getByRole("heading", { name: "Welcome back" }),
+    page.getByRole("heading", { name: "Sign in", exact: true }),
   ).toBeVisible();
   await login(page);
   await expect(page).toHaveURL("http://localhost:3101/");
