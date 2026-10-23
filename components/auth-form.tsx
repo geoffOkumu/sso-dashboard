@@ -1,7 +1,7 @@
 "use client";
-import { useState, type FormEvent } from "react";
+import { useId, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { ShieldCheck, Loader2 } from "lucide-react";
+import { ShieldCheck, Loader2, Mail, Smartphone } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -24,7 +24,10 @@ export function AuthForm({
     [signInHref, setSignInHref] = useState("/sign-in"),
     [mfa, setMfa] = useState(false),
     [mfaMethod, setMfaMethod] = useState<"totp" | "email" | "recovery">("totp"),
-    [emailNotice, setEmailNotice] = useState("");
+    [emailNotice, setEmailNotice] = useState(""),
+    [emailCodeRequested, setEmailCodeRequested] = useState(false);
+  const mfaId = useId();
+  const mfaTabs = useRef<(HTMLButtonElement | null)[]>([]);
   const recovery = mfaMethod === "recovery";
   function changeMfaMethod(method: typeof mfaMethod) {
     setMfaMethod(method);
@@ -42,6 +45,7 @@ export function AuthForm({
           result.error.message || "Could not send the email code.",
         );
       setMfaMethod("email");
+      setEmailCodeRequested(true);
       setEmailNotice(
         "Code sent to your account email. It expires in 3 minutes.",
       );
@@ -179,7 +183,9 @@ export function AuthForm({
           ? recovery
             ? "Enter one of your recovery codes."
             : mfaMethod === "email"
-              ? "Enter the six-digit code sent to your account email."
+              ? emailCodeRequested
+                ? "Enter the six-digit code sent to your account email."
+                : "Request a sign-in code at your account email."
               : "Enter a code from your authenticator."
           : mode === "sign-in"
             ? "Continue with your account."
@@ -206,6 +212,54 @@ export function AuthForm({
         </div>
       ) : (
         <form onSubmit={submit} className="space-y-5">
+          {mfa && !recovery && (
+            <div
+              role="tablist"
+              aria-label="Verification method"
+              className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1"
+            >
+              {(
+                [
+                  {
+                    method: "totp",
+                    label: "Authenticator app",
+                    Icon: Smartphone,
+                  },
+                  { method: "email", label: "Email", Icon: Mail },
+                ] as const
+              ).map(({ method, label, Icon }, index) => (
+                <button
+                  key={method}
+                  ref={(element) => {
+                    mfaTabs.current[index] = element;
+                  }}
+                  id={`${mfaId}-${method}-tab`}
+                  type="button"
+                  role="tab"
+                  aria-selected={mfaMethod === method}
+                  aria-controls={`${mfaId}-${method}-panel`}
+                  tabIndex={mfaMethod === method ? 0 : -1}
+                  disabled={busy}
+                  onClick={() => changeMfaMethod(method)}
+                  onKeyDown={(event) => {
+                    let next: number;
+                    if (event.key === "ArrowLeft" || event.key === "ArrowRight")
+                      next = 1 - index;
+                    else if (event.key === "Home") next = 0;
+                    else if (event.key === "End") next = 1;
+                    else return;
+                    event.preventDefault();
+                    changeMfaMethod(next === 0 ? "totp" : "email");
+                    mfaTabs.current[next]?.focus();
+                  }}
+                  className="flex min-h-10 items-center justify-center gap-2 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50 aria-selected:bg-white aria-selected:text-foreground aria-selected:shadow-sm"
+                >
+                  <Icon size={15} aria-hidden="true" />
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
           {error && (
             <div
               role="alert"
@@ -324,23 +378,46 @@ export function AuthForm({
             </label>
           )}
           {mfa && (
-            <label className="block text-xs font-medium">
-              {recovery
-                ? "Recovery code"
-                : mfaMethod === "email"
-                  ? "Email code"
-                  : "Authentication code"}
-              <Input
-                key={mfaMethod}
-                name="code"
-                required
-                disabled={busy}
-                inputMode={recovery ? "text" : "numeric"}
-                autoComplete="one-time-code"
-                className="mt-2"
-                placeholder={recovery ? "Enter a recovery code" : "000000"}
-              />
-            </label>
+            <div
+              id={recovery ? undefined : `${mfaId}-${mfaMethod}-panel`}
+              role={recovery ? undefined : "tabpanel"}
+              aria-labelledby={
+                recovery ? undefined : `${mfaId}-${mfaMethod}-tab`
+              }
+              className="space-y-5"
+            >
+              {mfaMethod === "email" && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={busy}
+                  className="h-10 w-full shadow-none"
+                  onClick={() => void requestEmailCode()}
+                >
+                  <Mail size={15} aria-hidden="true" />
+                  {emailCodeRequested
+                    ? "Send a new email code"
+                    : "Email me a code"}
+                </Button>
+              )}
+              <label className="block text-xs font-medium">
+                {recovery
+                  ? "Recovery code"
+                  : mfaMethod === "email"
+                    ? "Email code"
+                    : "Authentication code"}
+                <Input
+                  key={mfaMethod}
+                  name="code"
+                  required
+                  disabled={busy}
+                  inputMode={recovery ? "text" : "numeric"}
+                  autoComplete="one-time-code"
+                  className="mt-2"
+                  placeholder={recovery ? "Enter a recovery code" : "000000"}
+                />
+              </label>
+            </div>
           )}
           {mode === "consent" ? (
             <div className="flex gap-3">
@@ -371,7 +448,9 @@ export function AuthForm({
             </div>
           ) : (
             <Button
-              disabled={busy}
+              disabled={
+                busy || (mfa && mfaMethod === "email" && !emailCodeRequested)
+              }
               className="h-11 w-full shadow-none"
               type="submit"
             >
@@ -401,17 +480,7 @@ export function AuthForm({
           )}
           {mfa && (
             <div className="space-y-3">
-              <button
-                type="button"
-                disabled={busy}
-                className="block w-full text-center text-xs text-primary hover:underline disabled:opacity-50"
-                onClick={() => void requestEmailCode()}
-              >
-                {mfaMethod === "email"
-                  ? "Send a new email code"
-                  : "Email me a code"}
-              </button>
-              {mfaMethod !== "totp" && (
+              {recovery && (
                 <button
                   type="button"
                   disabled={busy}

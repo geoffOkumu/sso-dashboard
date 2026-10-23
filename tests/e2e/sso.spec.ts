@@ -270,6 +270,19 @@ test("email MFA is optional, handles delivery errors, and preserves other verifi
   await page.goto("/sign-in");
   await login(page);
   await expect(page.getByLabel("Authentication code")).toBeVisible();
+  const authenticatorTab = page.getByRole("tab", { name: "Authenticator app" });
+  const emailTab = page.getByRole("tab", { name: "Email", exact: true });
+  await expect(authenticatorTab).toHaveAttribute("aria-selected", "true");
+  await authenticatorTab.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(emailTab).toBeFocused();
+  await expect(emailTab).toHaveAttribute("aria-selected", "true");
+  await expect(
+    page.getByRole("tabpanel", { name: "Email", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Verify and continue" }),
+  ).toBeDisabled();
   expect(sends).toBe(0);
   await page
     .getByRole("button", { name: "Email me a code", exact: true })
@@ -277,7 +290,7 @@ test("email MFA is optional, handles delivery errors, and preserves other verifi
   await expect(
     page.getByRole("alert").filter({ hasText: "Could not send" }),
   ).toBeVisible();
-  await expect(page.getByLabel("Authentication code")).toBeVisible();
+  await expect(emailTab).toHaveAttribute("aria-selected", "true");
   await page
     .getByRole("button", { name: "Email me a code", exact: true })
     .click();
@@ -294,14 +307,13 @@ test("email MFA is optional, handles delivery errors, and preserves other verifi
     .getByRole("button", { name: "Use authenticator code", exact: true })
     .click();
   await expect(page.getByLabel("Authentication code")).toHaveValue("");
-  await page
-    .getByRole("button", { name: "Email me a code", exact: true })
-    .click();
+  await emailTab.click();
+  expect(sends).toBe(2);
   await page
     .getByRole("button", { name: "Send a new email code", exact: true })
     .click();
   await expect(page.getByRole("status")).toContainText("Code sent");
-  expect(sends).toBe(4);
+  expect(sends).toBe(3);
   await page.route("**/api/auth/two-factor/verify-otp", (route) => {
     const body = route.request().postDataJSON();
     expect(body.trustDevice).toBe(false);
