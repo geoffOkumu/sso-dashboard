@@ -6,6 +6,7 @@ export type PolicyInput = {
     globalRole: string;
     securityVersion: number;
     twoFactorEnabled?: boolean | null;
+    passwordChangeRequired?: boolean;
   } | null;
   platform: { id: string; enabled: boolean; type?: "SSO" | "LINK" } | null;
   clientEnabled?: boolean;
@@ -38,6 +39,7 @@ export function decideAccess(input: PolicyInput): Decision {
   });
   if (!user) return deny("unauthenticated");
   if (user.status !== "ACTIVE") return deny("account_inactive");
+  if (user.passwordChangeRequired) return deny("password_change_required");
   if (!platform?.enabled || input.clientEnabled === false)
     return deny("platform_disabled");
   if (platform.type === "LINK") return deny("directory_resource");

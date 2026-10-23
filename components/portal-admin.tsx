@@ -100,7 +100,7 @@ export function UserManagement() {
       >
         <Button onClick={() => setInviting(true)}>
           <Plus size={14} />
-          Invite user
+          Add user
         </Button>
       </PageTitle>
       {(error || loadError) && (
@@ -240,7 +240,7 @@ export function UserManagement() {
         )}
       </Panel>
       {inviting && (
-        <Modal title="Invite a teammate" close={() => setInviting(false)}>
+        <Modal title="Add a teammate" close={() => setInviting(false)}>
           <InviteForm platforms={platforms.data?.items || []} done={done} />
         </Modal>
       )}
@@ -264,6 +264,7 @@ function InviteForm({
   done: () => void;
 }) {
   const [error, setError] = useState(""),
+    [method, setMethod] = useState("invitation"),
     [busy, setBusy] = useState(false),
     [platformId, setPlatformId] = useState(""),
     [roleId, setRoleId] = useState(""),
@@ -276,23 +277,45 @@ function InviteForm({
     setError("");
     const f = new FormData(e.currentTarget);
     try {
-      await api("/api/admin/invitations", {
-        name: f.get("name"),
-        email: f.get("email"),
-        globalRole: f.get("globalRole"),
-        grants,
-      });
+      await api(
+        method === "password" ? "/api/admin/users" : "/api/admin/invitations",
+        {
+          name: f.get("name"),
+          email: f.get("email"),
+          globalRole: f.get("globalRole"),
+          grants,
+          ...(method === "password"
+            ? {
+                password: f.get("password"),
+                passwordChangeRequired:
+                  f.get("passwordChangeRequired") === "on",
+              }
+            : {}),
+        },
+      );
       done();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Invitation failed");
+      setError(e instanceof Error ? e.message : "Unable to add user");
     } finally {
       setBusy(false);
     }
   }
   return (
     <form onSubmit={submit} className="space-y-5">
+      <Field label="Account setup">
+        <select
+          value={method}
+          onChange={(e) => setMethod(e.target.value)}
+          className="w-full"
+        >
+          <option value="invitation">Send email invitation</option>
+          <option value="password">Set a password</option>
+        </select>
+      </Field>
       <p className="text-xs leading-6 text-muted-foreground">
-        We’ll email a secure invitation. The link expires in 24 hours.
+        {method === "invitation"
+          ? "We’ll email a secure invitation. The link expires in 24 hours."
+          : "The account will be active immediately. Share the password securely with your teammate; no invitation email is sent."}
       </p>
       {error && <ErrorNotice message={error} />}
       <Field label="Full name">
@@ -318,6 +341,29 @@ function InviteForm({
           <option value="SUPERADMIN">Superadmin — full company access</option>
         </select>
       </Field>
+      {method === "password" && (
+        <>
+          <Field label="Password" hint="Use 12–128 characters.">
+            <Input
+              aria-label="Password"
+              name="password"
+              type="password"
+              required
+              minLength={12}
+              maxLength={128}
+              autoComplete="new-password"
+            />
+          </Field>
+          <label className="flex items-start gap-2 text-xs leading-5">
+            <input
+              type="checkbox"
+              name="passwordChangeRequired"
+              className="mt-1"
+            />
+            One-time password — require a password change on first sign-in
+          </label>
+        </>
+      )}
       <div className="border-t border-border pt-4">
         <h3 className="mb-3 text-xs font-medium">Initial platform access</h3>
         {grants.map((grant) => (
@@ -394,8 +440,14 @@ function InviteForm({
         </div>
       </div>
       <Button disabled={busy} className="w-full">
-        <Mail size={14} />
-        {busy ? "Sending invitation…" : "Send invitation"}
+        {method === "invitation" ? <Mail size={14} /> : <KeyRound size={14} />}
+        {method === "invitation"
+          ? busy
+            ? "Sending invitation…"
+            : "Send invitation"
+          : busy
+            ? "Creating user…"
+            : "Create user"}
       </Button>
     </form>
   );

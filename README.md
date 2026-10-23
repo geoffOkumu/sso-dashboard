@@ -1,6 +1,6 @@
 # Permit Kit
 
-Self-hosted, invitation-only identity and access management for internal tools. Permit Kit combines OpenID Connect (OIDC) single sign-on, platform-specific roles and permissions, TOTP multi-factor authentication, and central session revocation.
+Self-hosted, administrator-managed identity and access management for internal tools. Permit Kit combines OpenID Connect (OIDC) single sign-on, platform-specific roles and permissions, TOTP multi-factor authentication, and central session revocation.
 
 **Status: early development (0.1.0).** APIs and database schemas may change. Review the [security policy](SECURITY.md) and [deployment guide](docs/DEPLOYMENT.md) before using it with real accounts. The project has not undergone an independent security audit.
 
@@ -10,7 +10,7 @@ The Next.js application is the identity provider and administration portal. Two 
 
 ## Features
 
-- Invite employees, verify email ownership, and recover passwords through SMTP.
+- Invite employees through SMTP or create active accounts with an administrator-set password and an optional mandatory first-use password change.
 - Require TOTP MFA for administrators, with recovery codes.
 - Register OIDC clients and use Authorization Code Flow with PKCE S256.
 - Assign roles and permissions per tool, with server-side policy enforcement.
@@ -63,6 +63,8 @@ See [`.env.example`](.env.example) and the [deployment guide](docs/DEPLOYMENT.md
 | `TEST_DATABASE_URL`                                  | Dedicated database for database and browser tests.                   |
 
 Invitation requests persist the invitation then send email. If delivery fails, **Resend invitation** invalidates the old token and sends a replacement. Invitation links are not printed in logs.
+
+In **Users → Add user**, choose **Set a password** to create an active account without sending an invitation. Passwords must be 12–128 characters. This trusts the administrator to establish the user's identity and treats the email as verified; share the credentials securely. Enable **One-time password** to require a new password before dashboard or SSO access. Completing that change revokes existing sessions and requires signing in with the new password. Normal email invitations remain available, and public sign-up stays disabled.
 
 ## Add people and connect tools
 

@@ -14,7 +14,8 @@ export async function adminTransaction<T>(
       if (
         actor?.globalRole !== "SUPERADMIN" ||
         actor.status !== "ACTIVE" ||
-        !actor.twoFactorEnabled
+        !actor.twoFactorEnabled ||
+        actor.passwordChangeRequired
       )
         throw new HttpError(403, "Active superadmin with MFA required");
       return fn(tx);

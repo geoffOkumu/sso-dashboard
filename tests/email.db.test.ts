@@ -12,6 +12,9 @@ beforeAll(async () => {
     throw new Error("Disposable test schema required");
   process.env.SMTP_HOST = "127.0.0.1";
   process.env.SMTP_PORT = "3125";
+  process.env.SMTP_SECURE = "false";
+  process.env.SMTP_USER = "";
+  process.env.SMTP_PASSWORD = "";
   smtp = new SMTPServer({
     disabledCommands: ["AUTH", "STARTTLS"],
     onData(stream, _session, callback) {
@@ -89,6 +92,7 @@ describe("SMTP onboarding and reset", () => {
       data: {
         email,
         name: "Reset user",
+        passwordChangeRequired: true,
         status: "ACTIVE",
         emailVerified: true,
       },
@@ -121,6 +125,10 @@ describe("SMTP onboarding and reset", () => {
       auth.api.resetPassword({ body: { token, newPassword: old } }),
     ).rejects.toThrow();
     expect(await db.session.count({ where: { userId: user.id } })).toBe(0);
+    expect(
+      (await db.user.findUniqueOrThrow({ where: { id: user.id } }))
+        .passwordChangeRequired,
+    ).toBe(false);
     expect(
       (await db.user.findUniqueOrThrow({ where: { id: user.id } }))
         .securityVersion,

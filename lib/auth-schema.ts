@@ -8,6 +8,11 @@ export const userFields = {
   },
   status: { type: "string" as const, defaultValue: "INVITED", input: false },
   securityVersion: { type: "number" as const, defaultValue: 1, input: false },
+  passwordChangeRequired: {
+    type: "boolean" as const,
+    defaultValue: false,
+    input: false,
+  },
 };
 export const schemaPlugins = [
   jwt(),

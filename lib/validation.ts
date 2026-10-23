@@ -129,6 +129,19 @@ export const inviteInput = z.object({
   globalRole: z.enum(["EMPLOYEE", "SUPERADMIN"]).default("EMPLOYEE"),
   grants: z.array(grantInput).max(100).default([]),
 });
+export const passwordInput = z.string().min(12).max(128);
+export const createUserInput = inviteInput
+  .extend({
+    password: passwordInput,
+    passwordChangeRequired: z.boolean().default(false),
+  })
+  .strict();
+export const changeInitialPasswordInput = z
+  .object({
+    currentPassword: passwordInput,
+    newPassword: passwordInput,
+  })
+  .strict();
 export function safeReturnPath(value: unknown) {
   return typeof value === "string" &&
     /^\/(?!\/)[a-zA-Z0-9/_?=&.-]*$/.test(value)

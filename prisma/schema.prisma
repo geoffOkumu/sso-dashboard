@@ -8,26 +8,27 @@ datasource db {
 }
 
 model User {
-  id                 String               @id @default(dbgenerated("pg_catalog.gen_random_uuid()")) @db.Uuid
-  name               String
-  email              String
-  emailVerified      Boolean              @default(false)
-  image              String?
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @updatedAt
-  twoFactorEnabled   Boolean?             @default(false)
-  globalRole         String               @default("EMPLOYEE")
-  status             String               @default("INVITED")
-  securityVersion    Int                  @default(1)
-  assignments        UserPlatformAccess[]
-  auditEntries       AuditLog[]
-  sessions           Session[]
-  accounts           Account[]
-  twofactors         TwoFactor[]
-  oauthclients       OauthClient[]
-  oauthrefreshtokens OauthRefreshToken[]
-  oauthaccesstokens  OauthAccessToken[]
-  oauthconsents      OauthConsent[]
+  id                     String               @id @default(dbgenerated("pg_catalog.gen_random_uuid()")) @db.Uuid
+  name                   String
+  email                  String
+  emailVerified          Boolean              @default(false)
+  image                  String?
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+  twoFactorEnabled       Boolean?             @default(false)
+  globalRole             String               @default("EMPLOYEE")
+  status                 String               @default("INVITED")
+  securityVersion        Int                  @default(1)
+  passwordChangeRequired Boolean              @default(false)
+  assignments            UserPlatformAccess[]
+  auditEntries           AuditLog[]
+  sessions               Session[]
+  accounts               Account[]
+  twofactors             TwoFactor[]
+  oauthclients           OauthClient[]
+  oauthrefreshtokens     OauthRefreshToken[]
+  oauthaccesstokens      OauthAccessToken[]
+  oauthconsents          OauthConsent[]
 
   @@unique([email])
   @@map("user")

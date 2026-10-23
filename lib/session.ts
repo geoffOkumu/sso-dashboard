@@ -3,7 +3,15 @@ import { headers } from "next/headers";
 import { auth } from "./auth";
 import { db } from "./db";
 import { HttpError } from "./http";
-export async function requireUser(requestHeaders?: Headers) {
+export class PasswordChangeRequiredError extends HttpError {
+  constructor() {
+    super(403, "Change your temporary password before continuing");
+  }
+}
+export async function requireUser(
+  requestHeaders?: Headers,
+  options: { allowPasswordChange?: boolean } = {},
+) {
   const session = await auth.api.getSession({
     headers: requestHeaders ?? (await headers()),
   });
@@ -15,6 +23,8 @@ export async function requireUser(requestHeaders?: Headers) {
     user.securityVersion !== session.session.securityVersion
   )
     throw new HttpError(401, "Your session has expired or was revoked");
+  if (user.passwordChangeRequired && !options.allowPasswordChange)
+    throw new PasswordChangeRequiredError();
   return { user, session: session.session };
 }
 export async function requireAdmin(requestHeaders?: Headers) {
