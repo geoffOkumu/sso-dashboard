@@ -21,6 +21,14 @@ const env = getEnv();
 const oauthOptions = {
   loginPage: "/sign-in",
   consentPage: "/consent",
+  postLogin: {
+    page: "/change-password",
+    consentReferenceId: () => undefined,
+    shouldRedirect: async ({ user }: { user: { id: string } }) => {
+      const current = await db.user.findUnique({ where: { id: user.id } });
+      return !!current?.passwordChangeRequired;
+    },
+  },
   scopes: ["openid", "profile", "email", "offline_access"],
   grantTypes: ["authorization_code", "refresh_token"],
   validateRedirectUri: (uri, registered, defaultResult) =>
@@ -36,6 +44,7 @@ const oauthOptions = {
     const current = await db.user.findUnique({ where: { id: user.id } });
     return (
       current?.status === "ACTIVE" &&
+      !current.passwordChangeRequired &&
       current.globalRole === "SUPERADMIN" &&
       !!current.twoFactorEnabled
     );
@@ -128,7 +137,10 @@ export const auth = betterAuth({
       await db.$transaction(async (tx) => {
         await tx.user.update({
           where: { id: user.id },
-          data: { securityVersion: { increment: 1 } },
+          data: {
+            securityVersion: { increment: 1 },
+            passwordChangeRequired: false,
+          },
         });
         await tx.session.deleteMany({ where: { userId: user.id } });
         await tx.auditLog.create({
@@ -219,6 +231,33 @@ export const auth = betterAuth({
   },
   hooks: {
     before: createAuthMiddleware(async (ctx) => {
+      // A temporary-password session may only complete onboarding or sign out.
+      // Authorization is allowed through to the provider's post-login redirect;
+      // token issuance and access checks still enforce the authoritative policy.
+      if (
+        ![
+          "/get-session",
+          "/sign-in/email",
+          "/sign-out",
+          "/request-password-reset",
+          "/reset-password",
+          "/oauth2/authorize",
+          "/oauth2/continue",
+        ].includes(ctx.path) &&
+        !ctx.path.startsWith("/reset-password/")
+      ) {
+        const session = await getSessionFromCtx(ctx);
+        if (session) {
+          const user = await db.user.findUnique({
+            where: { id: session.user.id },
+          });
+          if (user?.passwordChangeRequired)
+            throw new APIError("FORBIDDEN", {
+              code: "PASSWORD_CHANGE_REQUIRED",
+              message: "Change your temporary password before continuing",
+            });
+        }
+      }
       if (
         ctx.path === "/oauth2/token" &&
         ctx.body?.grant_type === "refresh_token"
@@ -266,6 +305,15 @@ export const auth = betterAuth({
       if (ctx.path === "/oauth2/authorize") {
         const session = await getSessionFromCtx(ctx);
         if (session) {
+          const user = await db.user.findUnique({
+            where: { id: session.user.id },
+          });
+          if (
+            user?.passwordChangeRequired &&
+            user.status === "ACTIVE" &&
+            user.securityVersion === session.session.securityVersion
+          )
+            return;
           const clientId = String(ctx.query?.client_id || "");
           const client = await db.platformClient.findUnique({
             where: { oauthClientId: clientId },

@@ -1,5 +1,5 @@
 import { redirect, notFound } from "next/navigation";
-import { requireUser } from "@/lib/session";
+import { requireUser, PasswordChangeRequiredError } from "@/lib/session";
 import { productName } from "@/lib/env";
 import { HttpError } from "@/lib/http";
 import { Portal } from "@/components/portal";
@@ -29,6 +29,8 @@ export default async function Page({
   try {
     result = await requireUser();
   } catch (error) {
+    if (error instanceof PasswordChangeRequiredError)
+      redirect("/change-password");
     if (error instanceof HttpError && error.status === 401)
       redirect("/sign-in");
     throw error;

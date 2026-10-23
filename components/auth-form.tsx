@@ -10,13 +10,20 @@ export function AuthForm({
   token,
   name,
 }: {
-  mode: "sign-in" | "reset" | "forgot" | "invitation" | "consent";
+  mode:
+    | "sign-in"
+    | "reset"
+    | "forgot"
+    | "invitation"
+    | "consent"
+    | "initial-password";
   token?: string;
   name: string;
 }) {
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [success, setSuccess] = useState(""),
+    [signInHref, setSignInHref] = useState("/sign-in"),
     [mfa, setMfa] = useState(false),
     [recovery, setRecovery] = useState(false);
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -38,6 +45,21 @@ export function AuthForm({
         const data = await response.json();
         if (!response.ok) throw new Error(data.error);
         setSuccess("Invitation accepted. You can now sign in.");
+      } else if (mode === "initial-password") {
+        if (form.get("password") !== form.get("confirmPassword"))
+          throw new Error("New passwords do not match");
+        const response = await fetch("/api/me/change-initial-password", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            currentPassword: form.get("currentPassword"),
+            newPassword: form.get("password"),
+          }),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error);
+        setSignInHref(`/sign-in${window.location.search}`);
+        setSuccess("Password updated. Sign in with your new password.");
       } else if (mode === "forgot") {
         const result = await authClient.requestPasswordReset({
           email: String(form.get("email")),
@@ -109,6 +131,7 @@ export function AuthForm({
         "sign-in": "Welcome back",
         forgot: "Forgot your password?",
         reset: "Choose a new password",
+        "initial-password": "Change your temporary password",
         invitation: "You're invited",
         consent: "Connect your account",
       }[mode];
@@ -127,7 +150,9 @@ export function AuthForm({
               ? "Set up your company account to get started. Already have an account? Sign in first and leave the password blank."
               : mode === "consent"
                 ? "Allow this company application to use your name and email for sign-in."
-                : "We'll help you securely access your account."}
+                : mode === "initial-password"
+                  ? "Choose a new password before accessing your workspace or applications. Your temporary password will no longer work."
+                  : "We'll help you securely access your account."}
       </p>
       {success ? (
         <div
@@ -136,7 +161,7 @@ export function AuthForm({
         >
           <ShieldCheck size={22} />
           <p>{success}</p>
-          <Link className="font-semibold underline" href="/sign-in">
+          <Link className="font-semibold underline" href={signInHref}>
             Continue to sign in
           </Link>
         </div>
@@ -175,35 +200,67 @@ export function AuthForm({
               />
             </label>
           )}
-          {!mfa && ["sign-in", "reset", "invitation"].includes(mode) && (
+          {mode === "initial-password" && (
             <label className="block text-xs font-medium">
-              <span className="flex items-center justify-between">
-                Password
-                {mode === "sign-in" && (
-                  <Link
-                    href="/forgot-password"
-                    className="font-normal text-primary"
-                  >
-                    Forgot password?
-                  </Link>
-                )}
-              </span>
+              Temporary password
               <Input
-                aria-label="Password"
-                name="password"
+                name="currentPassword"
                 type="password"
-                required={mode !== "invitation"}
-                minLength={mode === "sign-in" ? 1 : 12}
+                required
                 maxLength={128}
-                autoComplete={
-                  mode === "sign-in" ? "current-password" : "new-password"
-                }
+                autoComplete="current-password"
                 className="mt-2"
-                placeholder={
-                  mode === "sign-in"
-                    ? "Enter your password"
-                    : "At least 12 characters"
-                }
+              />
+            </label>
+          )}
+          {!mfa &&
+            ["sign-in", "reset", "invitation", "initial-password"].includes(
+              mode,
+            ) && (
+              <label className="block text-xs font-medium">
+                <span className="flex items-center justify-between">
+                  {mode === "initial-password" ? "New password" : "Password"}
+                  {mode === "sign-in" && (
+                    <Link
+                      href="/forgot-password"
+                      className="font-normal text-primary"
+                    >
+                      Forgot password?
+                    </Link>
+                  )}
+                </span>
+                <Input
+                  aria-label={
+                    mode === "initial-password" ? "New password" : "Password"
+                  }
+                  name="password"
+                  type="password"
+                  required={mode !== "invitation"}
+                  minLength={mode === "sign-in" ? 1 : 12}
+                  maxLength={128}
+                  autoComplete={
+                    mode === "sign-in" ? "current-password" : "new-password"
+                  }
+                  className="mt-2"
+                  placeholder={
+                    mode === "sign-in"
+                      ? "Enter your password"
+                      : "At least 12 characters"
+                  }
+                />
+              </label>
+            )}
+          {mode === "initial-password" && (
+            <label className="block text-xs font-medium">
+              Confirm new password
+              <Input
+                name="confirmPassword"
+                type="password"
+                required
+                minLength={12}
+                maxLength={128}
+                autoComplete="new-password"
+                className="mt-2"
               />
             </label>
           )}
@@ -251,7 +308,7 @@ export function AuthForm({
                       ? "Sign in"
                       : mode === "forgot"
                         ? "Send reset link"
-                        : mode === "reset"
+                        : mode === "reset" || mode === "initial-password"
                           ? "Update password"
                           : "Accept invitation"}
                   <ArrowRight size={15} />
@@ -272,7 +329,7 @@ export function AuthForm({
       )}
       <div className="mt-8 border-t border-border pt-6 text-center text-xs leading-6 text-muted-foreground">
         {mode === "sign-in" ? (
-          <>New to the team? Ask your administrator for an invitation.</>
+          <>New to the team? Ask your administrator for an account.</>
         ) : (
           <Link href="/sign-in" className="text-primary">
             Back to sign in

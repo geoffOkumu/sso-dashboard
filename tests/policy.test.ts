@@ -19,6 +19,22 @@ const base: PolicyInput = {
 };
 describe("authoritative platform policy", () => {
   it.each(["EMPLOYEE", "SUPERADMIN"])(
+    "requires a password change before granting %s access",
+    (globalRole) => {
+      expect(
+        decideAccess({
+          ...base,
+          user: {
+            ...base.user!,
+            globalRole,
+            twoFactorEnabled: true,
+            passwordChangeRequired: true,
+          },
+        }).reason,
+      ).toBe("password_change_required");
+    },
+  );
+  it.each(["EMPLOYEE", "SUPERADMIN"])(
     "does not grant SSO authorization for directory links to %s",
     (globalRole) => {
       expect(

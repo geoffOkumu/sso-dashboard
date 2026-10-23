@@ -4,10 +4,12 @@ import { auth } from "@/lib/auth";
 import { requireAdmin } from "@/lib/session";
 import { adminTransaction, audit, updateUser } from "@/lib/admin";
 import { invite } from "@/lib/invitations";
+import { createUserWithPassword } from "@/lib/user-password";
 import { handle, HttpError, json, sameOrigin } from "@/lib/http";
 import {
   grantInput,
   inviteInput,
+  createUserInput,
   platformInput,
   roleKey,
   clientInput,
@@ -282,6 +284,11 @@ export async function POST(request: Request, context: Context) {
     }
     if (resource === "invitations")
       return json(await invite(user.id, inviteInput.parse(body)), 201);
+    if (resource === "users" && !id)
+      return json(
+        await createUserWithPassword(user.id, createUserInput.parse(body)),
+        201,
+      );
     if (resource === "users" && id)
       return json(
         await updateUser(

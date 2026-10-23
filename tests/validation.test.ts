@@ -5,8 +5,31 @@ import {
   platformInput,
   inviteInput,
   clientInput,
+  createUserInput,
 } from "../lib/validation";
 describe("input boundaries", () => {
+  it("requires a bounded password and a boolean first-use flag for direct creation", () => {
+    const input = {
+      name: "Test User",
+      email: "TEST@example.test",
+      password: "a".repeat(12),
+    };
+    expect(createUserInput.parse(input)).toMatchObject({
+      email: "test@example.test",
+      passwordChangeRequired: false,
+    });
+    for (const password of [undefined, "", "a".repeat(11), "a".repeat(129)])
+      expect(createUserInput.safeParse({ ...input, password }).success).toBe(
+        false,
+      );
+    expect(
+      createUserInput.safeParse({ ...input, passwordChangeRequired: "true" })
+        .success,
+    ).toBe(false);
+    expect(
+      createUserInput.safeParse({ ...input, emailVerified: true }).success,
+    ).toBe(false);
+  });
   it.each([
     "https://*.company.test/callback",
     "https://user:secret@company.test/callback",
