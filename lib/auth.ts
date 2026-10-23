@@ -18,6 +18,8 @@ import { sendMail } from "./mail";
 import { userFields } from "./auth-schema";
 import { currentAccess } from "./access";
 const env = getEnv();
+// Better Auth swallows sendOTP rejections; surface delivery failures in our after hook.
+const failedOtpDeliveries = new WeakSet<object>();
 const oauthOptions = {
   loginPage: "/sign-in",
   consentPage: "/consent",
@@ -170,6 +172,7 @@ export const auth = betterAuth({
     customRules: {
       "/sign-in/email": { window: 60, max: 10 },
       "/request-password-reset": { window: 60, max: 5 },
+      "/two-factor/send-otp": { window: 60, max: 2 },
       "/two-factor/*": { window: 60, max: 10 },
     },
   },
@@ -231,6 +234,16 @@ export const auth = betterAuth({
   },
   hooks: {
     before: createAuthMiddleware(async (ctx) => {
+      if (
+        ["/two-factor/send-otp", "/two-factor/verify-otp"].includes(ctx.path)
+      ) {
+        const session = await getSessionFromCtx(ctx);
+        // Email is a sign-in fallback, not a way to bypass authenticator enrollment.
+        if (session && !session.user.twoFactorEnabled)
+          throw new APIError("FORBIDDEN", {
+            message: "Set up your authenticator before using email codes",
+          });
+      }
       // A temporary-password session may only complete onboarding or sign out.
       // Authorization is allowed through to the provider's post-login redirect;
       // token issuance and access checks still enforce the authoritative policy.
@@ -333,6 +346,16 @@ export const auth = betterAuth({
         }
       }
     }),
+    after: createAuthMiddleware(async (ctx) => {
+      if (
+        ctx.path === "/two-factor/send-otp" &&
+        failedOtpDeliveries.delete(ctx.context)
+      )
+        throw new APIError("SERVICE_UNAVAILABLE", {
+          message:
+            "Could not send the email code. Try again or use another method.",
+        });
+    }),
   },
   plugins: [
     jwt({
@@ -342,7 +365,27 @@ export const auth = betterAuth({
       },
       jwt: { issuer: `${env.BETTER_AUTH_URL}/api/auth` },
     }),
-    twoFactor({ issuer: env.PRODUCT_NAME }),
+    twoFactor({
+      issuer: env.PRODUCT_NAME,
+      otpOptions: {
+        digits: 6,
+        period: 3,
+        allowedAttempts: 5,
+        storeOTP: "hashed",
+        sendOTP: async ({ user, otp }, ctx) => {
+          try {
+            await sendMail(
+              user.email,
+              `Your ${env.PRODUCT_NAME} sign-in code`,
+              `Your sign-in code is: ${otp}\nThis code expires in 3 minutes. Do not share it with anyone.\nIf you did not try to sign in, change your password.`,
+            );
+          } catch (error) {
+            if (ctx) failedOtpDeliveries.add(ctx.context);
+            throw error;
+          }
+        },
+      },
+    }),
     oauthProvider(oauthOptions),
   ],
 });

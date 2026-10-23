@@ -23,7 +23,38 @@ export function AuthForm({
     [success, setSuccess] = useState(""),
     [signInHref, setSignInHref] = useState("/sign-in"),
     [mfa, setMfa] = useState(false),
-    [recovery, setRecovery] = useState(false);
+    [mfaMethod, setMfaMethod] = useState<"totp" | "email" | "recovery">("totp"),
+    [emailNotice, setEmailNotice] = useState("");
+  const recovery = mfaMethod === "recovery";
+  function changeMfaMethod(method: typeof mfaMethod) {
+    setMfaMethod(method);
+    setError("");
+    setEmailNotice("");
+  }
+  async function requestEmailCode() {
+    setBusy(true);
+    setError("");
+    setEmailNotice("");
+    try {
+      const result = await authClient.twoFactor.sendOtp({ trustDevice: false });
+      if (result.error)
+        throw new Error(
+          result.error.message || "Could not send the email code.",
+        );
+      setMfaMethod("email");
+      setEmailNotice(
+        "Code sent to your account email. It expires in 3 minutes.",
+      );
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Could not send the email code. Try again.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
@@ -85,10 +116,15 @@ export function AuthForm({
           ? await authClient.twoFactor.verifyBackupCode({
               code: String(form.get("code")),
             })
-          : await authClient.twoFactor.verifyTotp({
-              code: String(form.get("code")),
-              trustDevice: false,
-            });
+          : mfaMethod === "email"
+            ? await authClient.twoFactor.verifyOtp({
+                code: String(form.get("code")).trim(),
+                trustDevice: false,
+              })
+            : await authClient.twoFactor.verifyTotp({
+                code: String(form.get("code")),
+                trustDevice: false,
+              });
         if (result.error) throw new Error(result.error.message);
         const destination =
           result.data &&
@@ -142,7 +178,9 @@ export function AuthForm({
         {mfa
           ? recovery
             ? "Enter one of your recovery codes."
-            : "Enter a code from your authenticator."
+            : mfaMethod === "email"
+              ? "Enter the six-digit code sent to your account email."
+              : "Enter a code from your authenticator."
           : mode === "sign-in"
             ? "Continue with your account."
             : mode === "invitation"
@@ -175,6 +213,14 @@ export function AuthForm({
             >
               {error}
             </div>
+          )}
+          {emailNotice && (
+            <p
+              role="status"
+              className="text-xs leading-5 text-muted-foreground"
+            >
+              {emailNotice}
+            </p>
           )}
           {mode === "invitation" && (
             <label className="block text-xs font-medium">
@@ -279,10 +325,17 @@ export function AuthForm({
           )}
           {mfa && (
             <label className="block text-xs font-medium">
-              {recovery ? "Recovery code" : "Authentication code"}
+              {recovery
+                ? "Recovery code"
+                : mfaMethod === "email"
+                  ? "Email code"
+                  : "Authentication code"}
               <Input
+                key={mfaMethod}
                 name="code"
                 required
+                disabled={busy}
+                inputMode={recovery ? "text" : "numeric"}
                 autoComplete="one-time-code"
                 className="mt-2"
                 placeholder={recovery ? "Enter a recovery code" : "000000"}
@@ -347,13 +400,38 @@ export function AuthForm({
             </Button>
           )}
           {mfa && (
-            <button
-              type="button"
-              className="block w-full text-center text-xs text-primary hover:underline"
-              onClick={() => setRecovery(!recovery)}
-            >
-              {recovery ? "Use authenticator code" : "Use a recovery code"}
-            </button>
+            <div className="space-y-3">
+              <button
+                type="button"
+                disabled={busy}
+                className="block w-full text-center text-xs text-primary hover:underline disabled:opacity-50"
+                onClick={() => void requestEmailCode()}
+              >
+                {mfaMethod === "email"
+                  ? "Send a new email code"
+                  : "Email me a code"}
+              </button>
+              {mfaMethod !== "totp" && (
+                <button
+                  type="button"
+                  disabled={busy}
+                  className="block w-full text-center text-xs text-primary hover:underline disabled:opacity-50"
+                  onClick={() => changeMfaMethod("totp")}
+                >
+                  Use authenticator code
+                </button>
+              )}
+              {!recovery && (
+                <button
+                  type="button"
+                  disabled={busy}
+                  className="block w-full text-center text-xs text-primary hover:underline disabled:opacity-50"
+                  onClick={() => changeMfaMethod("recovery")}
+                >
+                  Use a recovery code
+                </button>
+              )}
+            </div>
           )}
         </form>
       )}

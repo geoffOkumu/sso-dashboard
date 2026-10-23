@@ -11,7 +11,7 @@ The Next.js application is the identity provider and administration portal. Two 
 ## Features
 
 - Invite employees through SMTP or create active accounts with an administrator-set password and an optional mandatory first-use password change.
-- Require TOTP MFA for administrators, with recovery codes.
+- Require authenticator MFA enrollment for administrators, with recovery codes and optional email codes at sign-in. Email codes use the configured SMTP server, expire after 3 minutes, and can be requested up to twice per minute.
 - Register OIDC clients and use Authorization Code Flow with PKCE S256.
 - Assign roles and permissions per tool, with server-side policy enforcement.
 - Revoke sessions centrally and record administrative audit events.

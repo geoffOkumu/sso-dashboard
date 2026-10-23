@@ -11,7 +11,11 @@ async function handler(request: Request) {
     )
       await rateLimit(
         `auth:${requestAddress(request)}:${path}`,
-        path.endsWith("/token") ? 60 : 10,
+        path.endsWith("/token")
+          ? 60
+          : path.endsWith("/two-factor/send-otp")
+            ? 2
+            : 10,
       );
     const response = await auth.handler(request);
     response.headers.set("Cache-Control", "no-store, private");

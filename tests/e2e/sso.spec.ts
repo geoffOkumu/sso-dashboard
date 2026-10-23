@@ -248,6 +248,80 @@ test("role changes, global logout and a fresh central sign-in cannot revive old 
   ).toBe(403);
   await admin.close();
 });
+test("email MFA is optional, handles delivery errors, and preserves other verification methods", async ({
+  page,
+}) => {
+  await page.route("**/api/auth/sign-in/email", (route) =>
+    route.fulfill({ json: { twoFactorRedirect: true } }),
+  );
+  let sends = 0;
+  await page.route("**/api/auth/two-factor/send-otp", (route) => {
+    sends++;
+    return sends === 1
+      ? route.fulfill({
+          status: 503,
+          json: {
+            message:
+              "Could not send the email code. Try again or use another method.",
+          },
+        })
+      : route.fulfill({ json: { status: true } });
+  });
+  await page.goto("/sign-in");
+  await login(page);
+  await expect(page.getByLabel("Authentication code")).toBeVisible();
+  expect(sends).toBe(0);
+  await page
+    .getByRole("button", { name: "Email me a code", exact: true })
+    .click();
+  await expect(
+    page.getByRole("alert").filter({ hasText: "Could not send" }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Authentication code")).toBeVisible();
+  await page
+    .getByRole("button", { name: "Email me a code", exact: true })
+    .click();
+  await expect(page.getByRole("status")).toContainText("expires in 3 minutes");
+  await expect(page.getByLabel("Email code", { exact: true })).toBeVisible();
+  await page.getByLabel("Email code", { exact: true }).fill("123456");
+  await page
+    .getByRole("button", { name: "Use a recovery code", exact: true })
+    .click();
+  await expect(page.getByLabel("Recovery code", { exact: true })).toHaveValue(
+    "",
+  );
+  await page
+    .getByRole("button", { name: "Use authenticator code", exact: true })
+    .click();
+  await expect(page.getByLabel("Authentication code")).toHaveValue("");
+  await page
+    .getByRole("button", { name: "Email me a code", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Send a new email code", exact: true })
+    .click();
+  await expect(page.getByRole("status")).toContainText("Code sent");
+  expect(sends).toBe(4);
+  await page.route("**/api/auth/two-factor/verify-otp", (route) => {
+    const body = route.request().postDataJSON();
+    expect(body.trustDevice).toBe(false);
+    return body.code === "654321"
+      ? route.fulfill({ json: { url: "/forgot-password" } })
+      : route.fulfill({ status: 401, json: { message: "Invalid code" } });
+  });
+  await page.getByLabel("Email code", { exact: true }).fill("123456");
+  await page
+    .getByRole("button", { name: "Verify and continue", exact: true })
+    .click();
+  await expect(
+    page.getByRole("alert").filter({ hasText: "Invalid code" }),
+  ).toBeVisible();
+  await page.getByLabel("Email code", { exact: true }).fill("654321");
+  await page
+    .getByRole("button", { name: "Verify and continue", exact: true })
+    .click();
+  await expect(page).toHaveURL("http://localhost:3100/forgot-password");
+});
 test("MFA enrollment is mandatory for a superadmin and revokes pre-enrollment sessions", async ({
   page,
 }) => {
