@@ -23,10 +23,10 @@
     "setup:env": "node --import tsx scripts/setup-env.ts"
   },
   "dependencies": {
-    "@better-auth/oauth-provider": "1.7.10",
+    "@better-auth/oauth-provider": "1.7.12",
     "@prisma/client": "6.19.2",
     "@radix-ui/react-slot": "1.5.0",
-    "better-auth": "1.7.10",
+    "better-auth": "1.7.12",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "dotenv": "17.3.1",
