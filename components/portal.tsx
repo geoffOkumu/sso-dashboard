@@ -297,11 +297,13 @@ export function Avatar({
 }
 function MyApps({ me }: { me: Me }) {
   const [search, setSearch] = useState(""),
-    apps = me.apps.filter((app) =>
+    matches = me.apps.filter((app) =>
       `${app.name} ${app.description}`
         .toLowerCase()
         .includes(search.toLowerCase()),
-    );
+    ),
+    apps = matches.filter((app) => app.type === "SSO"),
+    resources = matches.filter((app) => app.type === "LINK");
   return (
     <>
       <PageTitle
@@ -346,40 +348,99 @@ function MyApps({ me }: { me: Me }) {
           placeholder="Search apps and resources..."
         />
       </div>
-      {apps.length ? (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {apps.map((app) => (
-            <a
-              key={app.id}
-              href={app.launchUrl}
-              className="group flex min-h-[200px] flex-col rounded-xl border border-border bg-white p-5 transition-all hover:border-primary-border hover:shadow-sm"
-            >
-              <div className="mb-4 flex items-start justify-between">
-                <AppIcon icon={app.icon} />
-                <ArrowUpRight
-                  size={17}
-                  className="text-slate-300 transition-colors group-hover:text-primary"
-                />
+      {matches.length ? (
+        <div className="space-y-10">
+          <section aria-labelledby="apps-heading">
+            <div className="mb-4 flex items-center gap-2">
+              <h2 id="apps-heading" className="text-sm font-semibold">
+                Apps
+              </h2>
+              <Badge>{apps.length}</Badge>
+            </div>
+            {apps.length ? (
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {apps.map((app) => (
+                  <a
+                    key={app.id}
+                    href={app.launchUrl}
+                    className="group flex min-h-[200px] flex-col rounded-xl border border-border bg-white p-5 transition-all hover:border-primary-border hover:shadow-sm"
+                  >
+                    <div className="mb-4 flex items-start justify-between">
+                      <AppIcon icon={app.icon} />
+                      <ArrowUpRight
+                        size={17}
+                        className="text-slate-300 transition-colors group-hover:text-primary"
+                      />
+                    </div>
+                    <h3 className="text-sm font-semibold">{app.name}</h3>
+                    <p className="mb-5 mt-2 flex-1 text-xs leading-5 text-muted-foreground">
+                      {app.description}
+                    </p>
+                    <div className="flex items-center justify-between border-t border-border pt-3">
+                      <Badge tone="blue">
+                        {app.access?.role === "superadmin"
+                          ? "Full access"
+                          : app.access?.role}
+                      </Badge>
+                      <span className="flex items-center gap-1 text-[11px] font-medium text-primary">
+                        Open application
+                        <ArrowRight size={12} />
+                      </span>
+                    </div>
+                  </a>
+                ))}
               </div>
-              <h3 className="text-sm font-semibold">{app.name}</h3>
-              <p className="mb-5 mt-2 flex-1 text-xs leading-5 text-muted-foreground">
-                {app.description}
+            ) : (
+              <p className="text-xs leading-5 text-muted-foreground">
+                {search
+                  ? "No apps match your search."
+                  : "No apps assigned yet."}
               </p>
-              <div className="flex items-center justify-between border-t border-border pt-3">
-                <Badge tone={app.type === "LINK" ? "neutral" : "blue"}>
-                  {app.type === "LINK"
-                    ? "Directory resource"
-                    : app.access?.role === "superadmin"
-                      ? "Full access"
-                      : app.access?.role}
-                </Badge>
-                <span className="flex items-center gap-1 text-[11px] font-medium text-primary">
-                  {app.type === "LINK" ? "Open resource" : "Open application"}
-                  <ArrowRight size={12} />
-                </span>
-              </div>
-            </a>
-          ))}
+            )}
+          </section>
+          <section aria-labelledby="resources-heading">
+            <div className="mb-4 flex items-center gap-2">
+              <h2 id="resources-heading" className="text-sm font-semibold">
+                Resources
+              </h2>
+              <Badge>{resources.length}</Badge>
+            </div>
+            {resources.length ? (
+              <ul className="divide-y divide-border border-y border-border">
+                {resources.map((resource) => (
+                  <li key={resource.id}>
+                    <a
+                      href={resource.launchUrl}
+                      className="group flex items-center gap-3 px-2 py-4 transition-colors hover:bg-muted"
+                    >
+                      <AppIcon icon={resource.icon} small />
+                      <div className="min-w-0 flex-1 break-words">
+                        <h3 className="text-sm font-medium group-hover:text-primary">
+                          {resource.name}
+                        </h3>
+                        {resource.description && (
+                          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                            {resource.description}
+                          </p>
+                        )}
+                      </div>
+                      <ArrowUpRight
+                        aria-hidden="true"
+                        size={16}
+                        className="shrink-0 text-muted-foreground group-hover:text-primary"
+                      />
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-xs leading-5 text-muted-foreground">
+                {search
+                  ? "No resources match your search."
+                  : "No shared resources yet."}
+              </p>
+            )}
+          </section>
         </div>
       ) : (
         <Panel>
